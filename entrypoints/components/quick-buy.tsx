@@ -29,12 +29,22 @@ const waitForElm = (selector: string) => {
 
 const QuickBuy = () => {
   const getCurrentPrice = () => {
-    const price = document.querySelector('.chart-title-indicator-container span:nth-child(9)');
-    return price ? Number(price.textContent) : null;
+    const orders = document.querySelectorAll('[role="gridcell"]')
+    let sellPrice = 0
+    Array.from(orders).forEach(el => {
+      if (sellPrice) return
+      const priceEl = el.querySelector('.cursor-pointer')
+      const color = getComputedStyle(priceEl!).getPropertyValue('color')
+      if (color === 'rgb(246, 70, 93)') {
+        sellPrice = Number(priceEl?.textContent)
+      }
+    })
+
+    return sellPrice
   }
 
   const fillBuyPrice = (price: number) => {
-    const buyPrice = price * (1 + SLIPAGE);
+    const buyPrice = price * (1 + SLIPAGE)
     const input = document.getElementById('limitPrice');
     if (!input) {
       console.error("Buy price input not found");
