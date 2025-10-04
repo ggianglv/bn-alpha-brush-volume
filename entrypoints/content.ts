@@ -9,7 +9,6 @@ export default defineContentScript({
       const loginButton = document.querySelector('#toLoginPage')
       if (loginButton) return
       const buyButton = document.querySelector('.bn-button__buy') as HTMLElement
-      console.log(buyButton, 'buyButton')
       if (!buyButton) return
       const container = document.createElement('div')
       container.classList.add('flex')
