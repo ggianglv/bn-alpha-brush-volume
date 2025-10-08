@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@mantine/core';
-import { waitForElm } from '@/entrypoints/app/utils.ts';
+import { getBuySlippage, getSellSlippage, getUseBuyPriceAsSellPrice, getVolume, waitForElm } from '@/entrypoints/app/utils.ts';
 
 const SLIPAGE = 0.002;
 
@@ -25,7 +25,8 @@ const QuickBuy = () => {
   };
 
   const fillBuyPrice = (price: number) => {
-    const buyPrice = price * (1 + SLIPAGE);
+    const slippage = getBuySlippage();
+    const buyPrice = price * (1 + slippage / 100);
     const input = document.getElementById('limitPrice');
     if (!input) {
       console.error('Buy price input not found');
@@ -37,7 +38,8 @@ const QuickBuy = () => {
   };
 
   const fillSellPrice = (price: number) => {
-    const sellPrice = price * (1 - 0.0005);
+    const slippage = getSellSlippage();
+    const sellPrice = price * (1 - slippage / 100);
     const inputs = document.querySelectorAll('#limitTotal');
     const input = inputs[1];
     if (!input) {
@@ -49,12 +51,13 @@ const QuickBuy = () => {
     input.dispatchEvent(event);
   };
 
-  const fillVolume = (volume: number) => {
+  const fillVolume = () => {
     const input = document.getElementById('limitTotal');
     if (!input) {
       console.error('Volume input not found');
       return;
     }
+    const volume = getVolume();
     (input as HTMLInputElement).value = volume.toString();
     const event = new Event('input', { bubbles: true });
     input.dispatchEvent(event);
@@ -80,9 +83,10 @@ const QuickBuy = () => {
       return;
     }
 
-    fillBuyPrice(lastestBuyPrice);
-    fillSellPrice(lastestSellPrice);
-    fillVolume(550);
+    const useBuyPriceAsSellPrice = getUseBuyPriceAsSellPrice()
+    fillBuyPrice(lastestSellPrice);
+    fillSellPrice(useBuyPriceAsSellPrice ? lastestSellPrice : lastestBuyPrice);
+    fillVolume();
     // executeBuy();
   };
 
