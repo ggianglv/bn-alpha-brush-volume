@@ -1,31 +1,8 @@
-import { createRoot } from 'react-dom/client';
-import { Button, MantineProvider } from '@mantine/core';
-import '@mantine/core/styles.css';
-import Setting from '@/entrypoints/components/setting.tsx';
+import React from 'react';
+import { Button } from '@mantine/core';
+import { waitForElm } from '@/entrypoints/app/utils.ts';
 
-const SLIPAGE = 0.0002;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const waitForElm = (selector: string) => {
-  return new Promise((resolve) => {
-    if (document.querySelector(selector)) {
-      return resolve(document.querySelector(selector));
-    }
-
-    const observer = new MutationObserver((mutations) => {
-      if (document.querySelector(selector)) {
-        observer.disconnect();
-        resolve(document.querySelector(selector));
-      }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  });
-};
+const SLIPAGE = 0.002;
 
 const QuickBuy = () => {
   const getLatestPrice = () => {
@@ -110,24 +87,9 @@ const QuickBuy = () => {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <Button h={40} fullWidth onClick={handleTrade} variant="outline" color="red">
-        Quick Sell
-      </Button>
-      <Button h={40} fullWidth onClick={handleTrade}>
-        Trade
-      </Button>
-      <Setting />
-    </div>
-  );
-};
-
-export const renderQuickBuy = (container: HTMLElement) => {
-  const root = createRoot(container);
-  root.render(
-    <MantineProvider>
-      <QuickBuy />
-    </MantineProvider>
+    <Button fullWidth onClick={handleTrade} variant="outline" color="#2EBD85">
+      Quick Buy
+    </Button>
   );
 };
 
