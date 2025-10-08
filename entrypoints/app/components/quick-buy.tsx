@@ -1,29 +1,16 @@
 import React from 'react';
 import { Button } from '@mantine/core';
-import { getBuySlippage, getSellSlippage, getUseBuyPriceAsSellPrice, getVolume, waitForElm } from '@/entrypoints/app/utils.ts';
-
-const SLIPAGE = 0.002;
+import {
+  getBuySlippage,
+  getSellSlippage,
+  getUseBuyPriceAsSellPrice,
+  getVolume,
+  sleep,
+  waitForElm,
+  getLatestPrice,
+} from '@/entrypoints/app/utils.ts';
 
 const QuickBuy = () => {
-  const getLatestPrice = () => {
-    const orders = document.querySelectorAll('[role="gridcell"]');
-    let sellPrice = 0;
-    let buyPrice = 0;
-    Array.from(orders).forEach((el) => {
-      const priceEl = el.querySelector('.cursor-pointer');
-      const color = getComputedStyle(priceEl!).getPropertyValue('color');
-      if (color === 'rgb(246, 70, 93)' && !sellPrice) {
-        sellPrice = Number(priceEl?.textContent);
-      }
-
-      if (color === 'rgb(46, 189, 133)' && !buyPrice) {
-        buyPrice = Number(priceEl?.textContent);
-      }
-    });
-
-    return { sellPrice, buyPrice };
-  };
-
   const fillBuyPrice = (price: number) => {
     const slippage = getBuySlippage();
     const buyPrice = price * (1 + slippage / 100);
@@ -63,6 +50,16 @@ const QuickBuy = () => {
     input.dispatchEvent(event);
   };
 
+  const checkReserveOrder = () => {
+    const reverseOrderCheckbox = document.querySelector('[role="checkbox"]');
+    if (!reverseOrderCheckbox) {
+      throw new Error('Reserve order is required');
+    }
+    if (reverseOrderCheckbox.ariaChecked === 'false') {
+      (reverseOrderCheckbox as HTMLElement).click();
+    }
+  };
+
   const executeBuy = () => {
     const buyButton = document.querySelector('.bn-button__buy');
     if (!buyButton) {
@@ -70,7 +67,6 @@ const QuickBuy = () => {
       return;
     }
     (buyButton as HTMLButtonElement).click();
-    const confirmButton = document.querySelector('[role="dialog"] .bn-button__primary');
     waitForElm('[role="dialog"] .bn-button__primary').then((button) => {
       button && (button as HTMLButtonElement).click();
     });
@@ -82,8 +78,9 @@ const QuickBuy = () => {
       console.error('Failed to get latest price');
       return;
     }
-
-    const useBuyPriceAsSellPrice = getUseBuyPriceAsSellPrice()
+    const useBuyPriceAsSellPrice = getUseBuyPriceAsSellPrice();
+    checkReserveOrder();
+    await sleep(50);
     fillBuyPrice(lastestSellPrice);
     fillSellPrice(useBuyPriceAsSellPrice ? lastestSellPrice : lastestBuyPrice);
     fillVolume();

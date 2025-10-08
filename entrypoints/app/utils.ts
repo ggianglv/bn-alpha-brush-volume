@@ -44,7 +44,7 @@ export const getSavedSettings = (): SavedSettings => {
   } catch (error) {
     console.error('Failed to load settings from localStorage:', error);
   }
-  
+
   return {
     buySlippage: DEFAULT_BUY_SLIPPAGE,
     sellSlippage: DEFAULT_SELL_SLIPPAGE,
@@ -78,4 +78,23 @@ export const saveSettings = (settings: SavedSettings): boolean => {
     console.error('Failed to save settings to localStorage:', error);
     return false;
   }
+};
+
+export const getLatestPrice = () => {
+  const orders = document.querySelectorAll('[role="gridcell"]');
+  let sellPrice = 0;
+  let buyPrice = 0;
+  Array.from(orders).forEach((el) => {
+    const priceEl = el.querySelector('.cursor-pointer');
+    const color = getComputedStyle(priceEl!).getPropertyValue('color');
+    if (color === 'rgb(246, 70, 93)' && !sellPrice) {
+      sellPrice = Number(priceEl?.textContent);
+    }
+
+    if (color === 'rgb(46, 189, 133)' && !buyPrice) {
+      buyPrice = Number(priceEl?.textContent);
+    }
+  });
+
+  return { sellPrice, buyPrice };
 };
