@@ -84,7 +84,7 @@ const QuickBuy = () => {
     fillBuyPrice(lastestSellPrice);
     fillSellPrice(useBuyPriceAsSellPrice ? lastestSellPrice : lastestBuyPrice);
     fillVolume();
-    // executeBuy();
+    executeBuy();
   };
 
   return (
