@@ -8,6 +8,7 @@ import {
   sleep,
   waitForElm,
   getLatestPrice,
+  random,
 } from '@/entrypoints/app/utils.ts';
 
 const QuickBuy = () => {
@@ -82,8 +83,11 @@ const QuickBuy = () => {
     checkReserveOrder();
     await sleep(50);
     fillBuyPrice(lastestSellPrice);
+    await sleep(random(50, 100));
     fillSellPrice(useBuyPriceAsSellPrice ? lastestSellPrice : lastestBuyPrice);
+    await sleep(random(50, 100));
     fillVolume();
+    await sleep(random(50, 100));
     executeBuy();
   };
 
