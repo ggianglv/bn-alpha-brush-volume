@@ -61,6 +61,23 @@ const QuickBuy = () => {
     }
   };
 
+  const randomClickOrderBook = () => {
+    const input = document.getElementById('limitPrice');
+    if (!input) {
+      console.error('Buy price input not found for order book click');
+      return;
+    }
+    input.click();
+    const orderBook = document.querySelector('[role="gridcell"]') as HTMLElement;
+    if (!orderBook) {
+      console.error('Order book not found for random click');
+      return;
+    }
+    orderBook.click();
+  }
+
+
+
   const executeBuy = () => {
     const buyButton = document.querySelector('.bn-button__buy');
     if (!buyButton) {
@@ -81,6 +98,7 @@ const QuickBuy = () => {
     }
     const useBuyPriceAsSellPrice = getUseBuyPriceAsSellPrice();
     checkReserveOrder();
+    randomClickOrderBook();
     await sleep(50);
     fillBuyPrice(lastestSellPrice);
     await sleep(random(50, 100));
