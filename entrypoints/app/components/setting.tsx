@@ -30,6 +30,7 @@ const Setting = () => {
     const success = saveSettings(settings);
     if (success) {
       setOpened(false);
+      window.location.reload();
     }
   };
 
