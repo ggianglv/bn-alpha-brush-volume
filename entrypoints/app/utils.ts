@@ -3,6 +3,8 @@ import {
   DEFAULT_SELL_SLIPPAGE,
   DEFAULT_VOLUME,
   DEFAULT_GAP_THRESHOLD,
+  DEFAULT_CANCEL_THRESHOLD,
+  DEFAULT_ORDER_LIMIT,
 } from './constants';
 
 export const waitForElm = (selector: string) => {
@@ -33,6 +35,8 @@ export interface SavedSettings {
   volume: number | string;
   useBuyPriceAsSellPrice: boolean;
   gapThreshold: number | string;
+  cancelThreshold: number | string;
+  orderLimit: number | string;
 }
 
 export const getSavedSettings = (): SavedSettings => {
@@ -46,6 +50,8 @@ export const getSavedSettings = (): SavedSettings => {
         volume: settings.volume ?? DEFAULT_VOLUME,
         useBuyPriceAsSellPrice: settings.useBuyPriceAsSellPrice ?? false,
         gapThreshold: settings.gapThreshold ?? DEFAULT_GAP_THRESHOLD,
+        cancelThreshold: settings.cancelThreshold ?? DEFAULT_CANCEL_THRESHOLD,
+        orderLimit: settings.orderLimit ?? DEFAULT_ORDER_LIMIT,
       };
     }
   } catch (error) {
@@ -58,6 +64,8 @@ export const getSavedSettings = (): SavedSettings => {
     volume: DEFAULT_VOLUME,
     useBuyPriceAsSellPrice: false,
     gapThreshold: DEFAULT_GAP_THRESHOLD,
+    cancelThreshold: DEFAULT_CANCEL_THRESHOLD,
+    orderLimit: DEFAULT_ORDER_LIMIT,
   };
 };
 
@@ -79,6 +87,14 @@ export const getUseBuyPriceAsSellPrice = (): boolean => {
 
 export const getGapThreshold = (): number => {
   return Number(getSavedSettings().gapThreshold);
+};
+
+export const getCancelThreshold = (): number => {
+  return Number(getSavedSettings().cancelThreshold);
+};
+
+export const getOrderLimit = (): number => {
+  return Number(getSavedSettings().orderLimit);
 };
 
 export const saveSettings = (settings: SavedSettings): boolean => {
@@ -113,4 +129,40 @@ export const getLatestPrice = () => {
 
 export const random = (min: number, max: number) => {
   return Math.random() * (max - min) + min;
+};
+
+// Open order interface for parsing orders from DOM
+export interface OpenOrder {
+  type: 'Buy' | 'Sell';
+  price: number;
+  cancelButton: HTMLElement;
+}
+
+// Parse open orders from the orders table in DOM
+export const getOpenOrders = (): OpenOrder[] => {
+  const orders: OpenOrder[] = [];
+  const tableBody = document.querySelector('.bn-web-table-tbody');
+  if (!tableBody) return orders;
+
+  const rows = tableBody.querySelectorAll('tr.bn-web-table-row');
+  rows.forEach((row) => {
+    const typeCell = row.querySelector('[aria-colindex="4"]');
+    const priceCell = row.querySelector('[aria-colindex="5"]');
+    const cancelCell = row.querySelector('[aria-colindex="11"]');
+
+    if (!typeCell || !priceCell || !cancelCell) return;
+
+    const type = typeCell.textContent?.trim() as 'Buy' | 'Sell';
+    const priceText = priceCell.textContent?.trim() || '0';
+    // Extract number from price text (e.g., "0.7 USDT" -> 0.7)
+    const price = parseFloat(priceText.replace(/[^\d.]/g, ''));
+    // Find the clickable cancel button (the div containing the SVG)
+    const cancelButton = cancelCell.querySelector('svg')?.closest('div') as HTMLElement;
+
+    if (type && price && cancelButton) {
+      orders.push({ type, price, cancelButton });
+    }
+  });
+
+  return orders;
 };

@@ -6,54 +6,85 @@ import {
   getUseBuyPriceAsSellPrice,
   getVolume,
   getGapThreshold,
+  getCancelThreshold,
+  getOrderLimit,
   sleep,
   waitForElm,
   getLatestPrice,
+  getOpenOrders,
   random,
 } from '@/entrypoints/app/utils.ts';
+import { executeCutLoss } from './quick-sell.tsx';
 
-// Status types
-export type AutoTradeStatus = 'idle' | 'ready' | 'cooling_down' | 'waiting_order';
+// Status types - added 'cancelling' and 'cut_loss'
+export type AutoTradeStatus =
+  | 'idle'
+  | 'ready'
+  | 'cooling_down'
+  | 'waiting_order'
+  | 'cancelling'
+  | 'cut_loss';
 
 interface AutoTradeProps {
-  onStatusChange?: (status: AutoTradeStatus, gap: number | null) => void;
+  onStatusChange?: (status: AutoTradeStatus, gap: number | null, orderCount: number) => void;
 }
 
 const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
   const [isRunning, setIsRunning] = useState(false);
   const [status, setStatus] = useState<AutoTradeStatus>('idle');
   const [currentGap, setCurrentGap] = useState<number | null>(null);
+  const [orderCount, setOrderCount] = useState(0);
 
   // Use refs to avoid useCallback/useEffect dependency issues
   const isRunningRef = useRef(false);
   const isCoolingDownRef = useRef(false);
+  const hadOpenOrdersRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gapIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Keep isRunningRef in sync with isRunning state
   useEffect(() => {
     isRunningRef.current = isRunning;
   }, [isRunning]);
 
-  // Notify parent of status/gap changes
+  // Notify parent of status/gap/orderCount changes
   useEffect(() => {
-    onStatusChange?.(status, currentGap);
-  }, [status, currentGap, onStatusChange]);
+    onStatusChange?.(status, currentGap, orderCount);
+  }, [status, currentGap, orderCount, onStatusChange]);
+
+  // Always poll gap for display, even when idle
+  useEffect(() => {
+    const updateGap = () => {
+      const { buyPrice, sellPrice } = getLatestPrice();
+      if (buyPrice && sellPrice) {
+        const gap = ((sellPrice - buyPrice) / buyPrice) * 100;
+        setCurrentGap(gap);
+      }
+    };
+
+    // Initial update
+    updateGap();
+
+    // Poll every 500ms
+    gapIntervalRef.current = setInterval(updateGap, 500);
+
+    return () => {
+      if (gapIntervalRef.current) {
+        clearInterval(gapIntervalRef.current);
+        gapIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // === Check if there are open orders ===
 
   const hasOpenOrders = (): boolean => {
-    // Find the open orders table body
     const tableBody = document.querySelector('.bn-web-table-tbody');
     if (!tableBody) {
-      // No table found, assume no orders
       return false;
     }
-
-    // Get all rows, excluding the hidden measure row
     const rows = tableBody.querySelectorAll('tr.bn-web-table-row');
-
-    // If there are any visible rows, there are open orders
     return rows.length > 0;
   };
 
@@ -174,6 +205,58 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     }
   };
 
+  // === Cancel/Cut-Loss Logic ===
+
+  const handleCancelAndCutLoss = async (buyPrice: number, sellPrice: number): Promise<boolean> => {
+    const cancelThreshold = getCancelThreshold();
+    const openOrders = getOpenOrders();
+
+    if (openOrders.length === 0) {
+      return false; // No orders to process
+    }
+
+    // Find stale BUY orders: currentBuyPrice > orderPrice * (1 + threshold%)
+    const staleBuyOrders = openOrders.filter(
+      (o) => o.type === 'Buy' && buyPrice > o.price * (1 + cancelThreshold / 100)
+    );
+
+    // Find stale SELL orders: currentSellPrice < orderPrice * (1 - threshold%)
+    const staleSellOrders = openOrders.filter(
+      (o) => o.type === 'Sell' && sellPrice < o.price * (1 - cancelThreshold / 100)
+    );
+
+    // Cancel stale buy orders
+    if (staleBuyOrders.length > 0) {
+      console.log(`[AutoTrade] Cancelling ${staleBuyOrders.length} stale BUY order(s)...`);
+      setStatus('cancelling');
+      for (const order of staleBuyOrders) {
+        console.log(`[AutoTrade] Cancelling BUY order at ${order.price}`);
+        order.cancelButton.click();
+        await sleep(200);
+      }
+    }
+
+    // Cancel ALL stale sell orders first, then execute ONE cut-loss
+    if (staleSellOrders.length > 0) {
+      console.log(`[AutoTrade] Cancelling ${staleSellOrders.length} stale SELL order(s)...`);
+      setStatus('cancelling');
+      for (const order of staleSellOrders) {
+        console.log(`[AutoTrade] Cancelling SELL order at ${order.price}`);
+        order.cancelButton.click();
+        await sleep(200);
+      }
+
+      // Execute cut-loss after cancelling all stale sell orders
+      console.log('[AutoTrade] Executing cut-loss...');
+      setStatus('cut_loss');
+      await executeCutLoss();
+
+      return true; // Indicate that we did cancel/cut-loss
+    }
+
+    return staleBuyOrders.length > 0; // Return true if we cancelled any buy orders
+  };
+
   // === Check and Trade Logic ===
 
   const checkAndTrade = useCallback(async () => {
@@ -195,8 +278,43 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       return;
     }
 
+    // Track order count - check if orders just completed
+    const currentlyHasOrders = hasOpenOrders();
+    if (hadOpenOrdersRef.current && !currentlyHasOrders) {
+      // Cycle complete!
+      const newCount = orderCount + 1;
+      setOrderCount(newCount);
+      console.log(`[AutoTrade] Order cycle complete! Count: ${newCount}`);
+
+      const limit = getOrderLimit();
+      if (limit > 0 && newCount >= limit) {
+        console.log(`[AutoTrade] Order limit reached (${newCount}/${limit}), stopping...`);
+        setIsRunning(false);
+        setStatus('idle');
+        return;
+      }
+    }
+    hadOpenOrdersRef.current = currentlyHasOrders;
+
+    // Handle cancel/cut-loss for stale orders
+    const didCancelOrCutLoss = await handleCancelAndCutLoss(buyPrice, sellPrice);
+    if (didCancelOrCutLoss) {
+      // Start cooldown after cancel/cut-loss
+      isCoolingDownRef.current = true;
+      setStatus('cooling_down');
+      const cooldown = random(1000, 3000);
+      console.log(
+        `[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s after cancel/cut-loss...`
+      );
+      cooldownTimeoutRef.current = setTimeout(() => {
+        isCoolingDownRef.current = false;
+        setStatus('ready');
+      }, cooldown);
+      return;
+    }
+
     // Check for open orders first
-    if (hasOpenOrders()) {
+    if (currentlyHasOrders) {
       console.log('[AutoTrade] Open orders exist, waiting for them to complete...');
       setStatus('waiting_order');
       return;
@@ -227,7 +345,7 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       // Gap is above threshold, just set ready status
       setStatus('ready');
     }
-  }, []);
+  }, [orderCount]);
 
   // === Polling with Random Interval ===
 
@@ -274,15 +392,16 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
 
   const handleToggle = () => {
     if (isRunning) {
-      // Stop
+      // Stop - don't reset counter
       console.log('[AutoTrade] Stopping...');
       setIsRunning(false);
       isCoolingDownRef.current = false;
       setStatus('idle');
-      setCurrentGap(null);
     } else {
-      // Start
+      // Start - reset counter
       console.log('[AutoTrade] Starting...');
+      setOrderCount(0);
+      hadOpenOrdersRef.current = false;
       setIsRunning(true);
       isCoolingDownRef.current = false;
       setStatus('ready');

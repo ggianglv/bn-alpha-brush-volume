@@ -6,6 +6,8 @@ import {
   DEFAULT_SELL_SLIPPAGE,
   DEFAULT_VOLUME,
   DEFAULT_GAP_THRESHOLD,
+  DEFAULT_CANCEL_THRESHOLD,
+  DEFAULT_ORDER_LIMIT,
 } from '@/entrypoints/app/constants.ts';
 import { saveSettings, getSavedSettings } from '@/entrypoints/app/utils.ts';
 
@@ -15,6 +17,8 @@ const Setting = () => {
   const [volume, setVolume] = useState<number | string>(DEFAULT_VOLUME);
   const [useBuyPriceAsSellPrice, setUseBuyPriceAsSellPrice] = useState<boolean>(false);
   const [gapThreshold, setGapThreshold] = useState<number | string>(DEFAULT_GAP_THRESHOLD);
+  const [cancelThreshold, setCancelThreshold] = useState<number | string>(DEFAULT_CANCEL_THRESHOLD);
+  const [orderLimit, setOrderLimit] = useState<number | string>(DEFAULT_ORDER_LIMIT);
   const [opened, setOpened] = useState(false);
 
   useEffect(() => {
@@ -24,6 +28,8 @@ const Setting = () => {
     setVolume(settings.volume);
     setUseBuyPriceAsSellPrice(settings.useBuyPriceAsSellPrice);
     setGapThreshold(settings.gapThreshold);
+    setCancelThreshold(settings.cancelThreshold);
+    setOrderLimit(settings.orderLimit);
   }, []);
 
   const handleSave = () => {
@@ -33,6 +39,8 @@ const Setting = () => {
       volume,
       useBuyPriceAsSellPrice,
       gapThreshold,
+      cancelThreshold,
+      orderLimit,
     };
 
     const success = saveSettings(settings);
@@ -97,6 +105,25 @@ const Setting = () => {
             placeholder="Gap threshold (%)"
             size="xs"
             step={0.1}
+            min={0}
+          />
+          <NumberInput
+            value={cancelThreshold}
+            onChange={setCancelThreshold}
+            style={{ marginTop: '8px' }}
+            label="Cancel order threshold (%)"
+            placeholder="Cancel threshold (%)"
+            size="xs"
+            step={0.1}
+            min={0}
+          />
+          <NumberInput
+            value={orderLimit}
+            onChange={setOrderLimit}
+            style={{ marginTop: '8px' }}
+            label="Order limit (0 = unlimited)"
+            placeholder="Order limit"
+            size="xs"
             min={0}
           />
           <Checkbox
