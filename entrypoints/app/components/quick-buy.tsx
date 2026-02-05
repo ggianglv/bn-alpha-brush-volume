@@ -8,7 +8,6 @@ import {
   sleep,
   waitForElm,
   getLatestPrice,
-  random,
 } from '@/entrypoints/app/utils.ts';
 
 const QuickBuy = () => {
@@ -74,9 +73,7 @@ const QuickBuy = () => {
       return;
     }
     orderBook.click();
-  }
-
-
+  };
 
   const executeBuy = () => {
     const buyButton = document.querySelector('.bn-button__buy');
@@ -91,8 +88,8 @@ const QuickBuy = () => {
   };
 
   const handleTrade = async () => {
-    const { buyPrice: lastestBuyPrice, sellPrice: lastestSellPrice } = getLatestPrice();
-    if (!lastestBuyPrice || !lastestSellPrice) {
+    const { buyPrice: latestBuyPrice, sellPrice: latestSellPrice } = getLatestPrice();
+    if (!latestBuyPrice || !latestSellPrice) {
       console.error('Failed to get latest price');
       return;
     }
@@ -100,8 +97,8 @@ const QuickBuy = () => {
     checkReserveOrder();
     randomClickOrderBook();
     await sleep(50);
-    fillBuyPrice(lastestSellPrice);
-    fillSellPrice(useBuyPriceAsSellPrice ? lastestSellPrice : lastestBuyPrice);
+    fillBuyPrice(latestSellPrice);
+    fillSellPrice(useBuyPriceAsSellPrice ? latestSellPrice : latestBuyPrice);
     fillVolume();
     executeBuy();
   };

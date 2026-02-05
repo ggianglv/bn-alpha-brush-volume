@@ -93,8 +93,9 @@ const App = () => {
                 color: isProfitable ? '#2EBD85' : '#F6465D',
                 fontWeight: 600,
               }}
+              title="Estimated P/L based on order prices (actual fill prices may vary)"
             >
-              P/L: {stats.totalProfit >= 0 ? '+' : ''}
+              P/L: ~{stats.totalProfit >= 0 ? '+' : ''}
               {stats.totalProfit.toFixed(4)} USDT
             </span>
           </>

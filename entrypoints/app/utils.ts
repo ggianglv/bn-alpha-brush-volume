@@ -18,16 +18,21 @@ import {
   VOLATILITY_SAMPLE_SIZE,
 } from './constants';
 
-export const waitForElm = (selector: string) => {
+export const waitForElm = (selector: string, timeout = 5000): Promise<Element | null> => {
   return new Promise((resolve) => {
-    if (document.querySelector(selector)) {
-      return resolve(document.querySelector(selector));
+    const existing = document.querySelector(selector);
+    if (existing) {
+      return resolve(existing);
     }
 
-    const observer = new MutationObserver((mutations) => {
-      if (document.querySelector(selector)) {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const observer = new MutationObserver(() => {
+      const element = document.querySelector(selector);
+      if (element) {
+        clearTimeout(timeoutId);
         observer.disconnect();
-        resolve(document.querySelector(selector));
+        resolve(element);
       }
     });
 
@@ -35,6 +40,13 @@ export const waitForElm = (selector: string) => {
       childList: true,
       subtree: true,
     });
+
+    // Timeout to prevent memory leaks if element never appears
+    timeoutId = setTimeout(() => {
+      observer.disconnect();
+      console.warn(`waitForElm: timeout waiting for ${selector}`);
+      resolve(null);
+    }, timeout);
   });
 };
 
