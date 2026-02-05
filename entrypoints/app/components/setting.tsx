@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Popover, Checkbox, NumberInput, Button } from '@mantine/core';
+import { Popover, Checkbox, NumberInput, Button, Divider, Text } from '@mantine/core';
 import { IconSettings } from '@tabler/icons-react';
 import {
   DEFAULT_BUY_SLIPPAGE,
@@ -8,10 +8,19 @@ import {
   DEFAULT_GAP_THRESHOLD,
   DEFAULT_CANCEL_THRESHOLD,
   DEFAULT_ORDER_LIMIT,
+  DEFAULT_MAX_LOSS,
+  DEFAULT_ENABLE_MOMENTUM_CHECK,
+  DEFAULT_MOMENTUM_THRESHOLD,
+  DEFAULT_ENABLE_DYNAMIC_SLIPPAGE,
+  DEFAULT_DYNAMIC_SLIPPAGE_FACTOR,
+  DEFAULT_MIN_SLIPPAGE,
+  DEFAULT_ENABLE_ORDER_BOOK_CHECK,
+  DEFAULT_ORDER_BOOK_RATIO_THRESHOLD,
 } from '@/entrypoints/app/constants.ts';
 import { saveSettings, getSavedSettings } from '@/entrypoints/app/utils.ts';
 
 const Setting = () => {
+  // Basic trading settings
   const [buySlippage, setBuySlippage] = useState<number | string>(DEFAULT_BUY_SLIPPAGE);
   const [sellSlippage, setSellSlippage] = useState<number | string>(DEFAULT_SELL_SLIPPAGE);
   const [volume, setVolume] = useState<number | string>(DEFAULT_VOLUME);
@@ -19,10 +28,34 @@ const Setting = () => {
   const [gapThreshold, setGapThreshold] = useState<number | string>(DEFAULT_GAP_THRESHOLD);
   const [cancelThreshold, setCancelThreshold] = useState<number | string>(DEFAULT_CANCEL_THRESHOLD);
   const [orderLimit, setOrderLimit] = useState<number | string>(DEFAULT_ORDER_LIMIT);
+
+  // Algorithm settings
+  const [maxLoss, setMaxLoss] = useState<number | string>(DEFAULT_MAX_LOSS);
+  const [enableMomentumCheck, setEnableMomentumCheck] = useState<boolean>(
+    DEFAULT_ENABLE_MOMENTUM_CHECK
+  );
+  const [momentumThreshold, setMomentumThreshold] = useState<number | string>(
+    DEFAULT_MOMENTUM_THRESHOLD
+  );
+  const [enableDynamicSlippage, setEnableDynamicSlippage] = useState<boolean>(
+    DEFAULT_ENABLE_DYNAMIC_SLIPPAGE
+  );
+  const [dynamicSlippageFactor, setDynamicSlippageFactor] = useState<number | string>(
+    DEFAULT_DYNAMIC_SLIPPAGE_FACTOR
+  );
+  const [minSlippage, setMinSlippage] = useState<number | string>(DEFAULT_MIN_SLIPPAGE);
+  const [enableOrderBookCheck, setEnableOrderBookCheck] = useState<boolean>(
+    DEFAULT_ENABLE_ORDER_BOOK_CHECK
+  );
+  const [orderBookRatioThreshold, setOrderBookRatioThreshold] = useState<number | string>(
+    DEFAULT_ORDER_BOOK_RATIO_THRESHOLD
+  );
+
   const [opened, setOpened] = useState(false);
 
   useEffect(() => {
     const settings = getSavedSettings();
+    // Basic settings
     setBuySlippage(settings.buySlippage);
     setSellSlippage(settings.sellSlippage);
     setVolume(settings.volume);
@@ -30,10 +63,20 @@ const Setting = () => {
     setGapThreshold(settings.gapThreshold);
     setCancelThreshold(settings.cancelThreshold);
     setOrderLimit(settings.orderLimit);
+    // Algorithm settings
+    setMaxLoss(settings.maxLoss);
+    setEnableMomentumCheck(settings.enableMomentumCheck);
+    setMomentumThreshold(settings.momentumThreshold);
+    setEnableDynamicSlippage(settings.enableDynamicSlippage);
+    setDynamicSlippageFactor(settings.dynamicSlippageFactor);
+    setMinSlippage(settings.minSlippage);
+    setEnableOrderBookCheck(settings.enableOrderBookCheck);
+    setOrderBookRatioThreshold(settings.orderBookRatioThreshold);
   }, []);
 
   const handleSave = () => {
     const settings = {
+      // Basic settings
       buySlippage,
       sellSlippage,
       volume,
@@ -41,6 +84,15 @@ const Setting = () => {
       gapThreshold,
       cancelThreshold,
       orderLimit,
+      // Algorithm settings
+      maxLoss,
+      enableMomentumCheck,
+      momentumThreshold,
+      enableDynamicSlippage,
+      dynamicSlippageFactor,
+      minSlippage,
+      enableOrderBookCheck,
+      orderBookRatioThreshold,
     };
 
     const success = saveSettings(settings);
@@ -56,7 +108,7 @@ const Setting = () => {
 
   return (
     <Popover
-      width={300}
+      width={320}
       trapFocus
       position="top-end"
       withArrow
@@ -71,29 +123,35 @@ const Setting = () => {
           onClick={() => setOpened((o) => !o)}
         />
       </Popover.Target>
-      <Popover.Dropdown>
+      <Popover.Dropdown style={{ maxHeight: '400px', overflowY: 'auto' }}>
         <div>
+          {/* Basic Trading Settings */}
+          <Text size="xs" fw={600} c="dimmed">
+            Basic Trading
+          </Text>
           <NumberInput
             value={buySlippage}
             onChange={setBuySlippage}
             style={{ marginTop: '8px' }}
-            label="Buy slippage (default 0.01%)"
+            label="Buy slippage (%)"
             placeholder="Buy slippage (%)"
             size="xs"
+            step={0.01}
           />
           <NumberInput
             value={sellSlippage}
             onChange={setSellSlippage}
             style={{ marginTop: '8px' }}
-            label="Sell slippage (default 0.01%)"
+            label="Sell slippage (%)"
             placeholder="Sell slippage (%)"
             size="xs"
+            step={0.01}
           />
           <NumberInput
             value={volume}
             onChange={setVolume}
             style={{ marginTop: '8px' }}
-            label="Volume"
+            label="Volume (USDT)"
             placeholder="Volume"
             size="xs"
           />
@@ -101,7 +159,7 @@ const Setting = () => {
             value={gapThreshold}
             onChange={setGapThreshold}
             style={{ marginTop: '8px' }}
-            label="Auto-trade gap threshold (%)"
+            label="Gap threshold (%)"
             placeholder="Gap threshold (%)"
             size="xs"
             step={0.1}
@@ -130,9 +188,101 @@ const Setting = () => {
             checked={useBuyPriceAsSellPrice}
             onChange={(event) => setUseBuyPriceAsSellPrice(event.currentTarget.checked)}
             style={{ marginTop: '12px' }}
-            label="Use buy price with slippage as sell price"
+            label="Use buy price as sell price"
             size="xs"
           />
+
+          <Divider my="md" />
+
+          {/* Algorithm Settings */}
+          <Text size="xs" fw={600} c="dimmed">
+            Algorithm Settings
+          </Text>
+
+          <NumberInput
+            value={maxLoss}
+            onChange={setMaxLoss}
+            style={{ marginTop: '8px' }}
+            label="Max loss (USDT) - stops when reached"
+            placeholder="Max loss"
+            size="xs"
+            min={0}
+          />
+
+          {/* Momentum Check */}
+          <Checkbox
+            checked={enableMomentumCheck}
+            onChange={(event) => setEnableMomentumCheck(event.currentTarget.checked)}
+            style={{ marginTop: '12px' }}
+            label="Enable momentum check"
+            size="xs"
+          />
+          {enableMomentumCheck && (
+            <NumberInput
+              value={momentumThreshold}
+              onChange={setMomentumThreshold}
+              style={{ marginTop: '8px' }}
+              label="Momentum threshold (%) - skip if below"
+              placeholder="Momentum threshold"
+              size="xs"
+              step={0.1}
+            />
+          )}
+
+          {/* Dynamic Slippage */}
+          <Checkbox
+            checked={enableDynamicSlippage}
+            onChange={(event) => setEnableDynamicSlippage(event.currentTarget.checked)}
+            style={{ marginTop: '12px' }}
+            label="Enable dynamic slippage (auto mode)"
+            size="xs"
+          />
+          {enableDynamicSlippage && (
+            <>
+              <NumberInput
+                value={dynamicSlippageFactor}
+                onChange={setDynamicSlippageFactor}
+                style={{ marginTop: '8px' }}
+                label="Dynamic slippage factor (% of spread)"
+                placeholder="Factor"
+                size="xs"
+                step={0.1}
+                min={0}
+                max={1}
+              />
+              <NumberInput
+                value={minSlippage}
+                onChange={setMinSlippage}
+                style={{ marginTop: '8px' }}
+                label="Minimum slippage (%)"
+                placeholder="Min slippage"
+                size="xs"
+                step={0.01}
+                min={0}
+              />
+            </>
+          )}
+
+          {/* Order Book Check */}
+          <Checkbox
+            checked={enableOrderBookCheck}
+            onChange={(event) => setEnableOrderBookCheck(event.currentTarget.checked)}
+            style={{ marginTop: '12px' }}
+            label="Enable order book analysis"
+            size="xs"
+          />
+          {enableOrderBookCheck && (
+            <NumberInput
+              value={orderBookRatioThreshold}
+              onChange={setOrderBookRatioThreshold}
+              style={{ marginTop: '8px' }}
+              label="Min buy/sell ratio - skip if below"
+              placeholder="Ratio threshold"
+              size="xs"
+              step={0.1}
+              min={0}
+            />
+          )}
 
           <div style={{ marginTop: '16px', marginBottom: '8px', display: 'flex', gap: '8px' }}>
             <Button size="xs" onClick={handleSave}>

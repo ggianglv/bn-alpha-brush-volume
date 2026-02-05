@@ -5,48 +5,52 @@ import '@mantine/core/styles.css';
 import Setting from './components/setting.tsx';
 import QuickSell from './components/quick-sell.tsx';
 import QuickBuy from './components/quick-buy.tsx';
-import AutoTrade, { AutoTradeStatus } from './components/auto-trade.tsx';
+import AutoTrade, { AutoTradeStatus, AutoTradeStats } from './components/auto-trade.tsx';
 import { getGapThreshold, getOrderLimit } from './utils.ts';
 
 // Helper function to get display text for status
-const getStatusText = (status: AutoTradeStatus): string => {
+const getStatusText = (status: AutoTradeStatus, skipReason: string | null): string => {
   switch (status) {
     case 'ready':
-      return 'Ready to trade';
+      return 'Ready';
     case 'cooling_down':
-      return 'Cooling down...';
+      return 'Cooling...';
     case 'waiting_order':
-      return 'Waiting for order to fill';
+      return 'Waiting order';
     case 'cancelling':
-      return 'Cancelling order...';
+      return 'Cancelling...';
     case 'cut_loss':
-      return 'Executing cut-loss...';
+      return 'Cut-loss...';
+    case 'skipping':
+      return skipReason ? `Skip: ${skipReason}` : 'Skipping...';
     default:
       return '';
   }
 };
 
 const App = () => {
-  const [autoTradeStatus, setAutoTradeStatus] = useState<AutoTradeStatus>('idle');
-  const [currentGap, setCurrentGap] = useState<number | null>(null);
-  const [orderCount, setOrderCount] = useState(0);
+  const [stats, setStats] = useState<AutoTradeStats>({
+    status: 'idle',
+    gap: null,
+    orderCount: 0,
+    totalProfit: 0,
+    momentum: null,
+    skipReason: null,
+  });
 
-  const handleStatusChange = useCallback(
-    (status: AutoTradeStatus, gap: number | null, count: number) => {
-      setAutoTradeStatus(status);
-      setCurrentGap(gap);
-      setOrderCount(count);
-    },
-    []
-  );
+  const handleStatusChange = useCallback((newStats: AutoTradeStats) => {
+    setStats(newStats);
+  }, []);
 
   const orderLimit = getOrderLimit();
   const gapThreshold = getGapThreshold();
-  const isGapGood = currentGap !== null && Math.abs(currentGap) < gapThreshold;
+  const isGapGood = stats.gap !== null && Math.abs(stats.gap) < gapThreshold;
+  const isRunning = stats.status !== 'idle';
+  const isProfitable = stats.totalProfit >= 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {/* Status display - Gap is always visible, status only when running */}
+      {/* Stats display row 1 - Gap and Momentum */}
       <div
         style={{
           fontSize: '11px',
@@ -54,6 +58,7 @@ const App = () => {
           display: 'flex',
           gap: '8px',
           padding: '4px 0',
+          flexWrap: 'wrap',
         }}
       >
         {/* Gap - always visible */}
@@ -62,24 +67,66 @@ const App = () => {
             color: isGapGood ? '#2EBD85' : '#848e9c',
           }}
         >
-          Gap: {currentGap !== null ? `${currentGap.toFixed(4)}%` : '-'}
+          Gap: {stats.gap !== null ? `${stats.gap.toFixed(4)}%` : '-'}
         </span>
 
-        {/* Order count - only visible when limit > 0 */}
-        {orderLimit > 0 && (
+        {/* Momentum - visible when available */}
+        {stats.momentum !== null && (
+          <>
+            <span>|</span>
+            <span
+              style={{
+                color: stats.momentum >= 0 ? '#2EBD85' : '#F6465D',
+              }}
+            >
+              Mom: {stats.momentum.toFixed(2)}%
+            </span>
+          </>
+        )}
+
+        {/* Profit/Loss - visible when running or has trades */}
+        {(isRunning || stats.totalProfit !== 0) && (
+          <>
+            <span>|</span>
+            <span
+              style={{
+                color: isProfitable ? '#2EBD85' : '#F6465D',
+                fontWeight: 600,
+              }}
+            >
+              P/L: {stats.totalProfit >= 0 ? '+' : ''}
+              {stats.totalProfit.toFixed(4)} USDT
+            </span>
+          </>
+        )}
+
+        {/* Order count - visible when limit > 0 or running */}
+        {(orderLimit > 0 || isRunning) && (
           <>
             <span>|</span>
             <span>
-              Orders: {orderCount}/{orderLimit}
+              Orders: {stats.orderCount}
+              {orderLimit > 0 ? `/${orderLimit}` : ''}
             </span>
           </>
         )}
 
         {/* Status text - only visible when running */}
-        {autoTradeStatus !== 'idle' && (
+        {isRunning && (
           <>
             <span>|</span>
-            <span>{getStatusText(autoTradeStatus)}</span>
+            <span
+              style={{
+                color:
+                  stats.status === 'skipping'
+                    ? '#F0B90B'
+                    : stats.status === 'ready'
+                      ? '#2EBD85'
+                      : '#848e9c',
+              }}
+            >
+              {getStatusText(stats.status, stats.skipReason)}
+            </span>
           </>
         )}
       </div>

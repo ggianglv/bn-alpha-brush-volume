@@ -8,25 +8,47 @@ import {
   getGapThreshold,
   getCancelThreshold,
   getOrderLimit,
+  getMaxLoss,
+  getEnableDynamicSlippage,
   sleep,
   waitForElm,
   getLatestPrice,
   getOpenOrders,
   random,
+  // Algorithm helpers
+  addPriceToHistory,
+  clearPriceHistory,
+  checkTradeConditions,
+  getCooldownMultiplier,
+  getTotalProfit,
+  recordTrade,
+  clearTradeHistory,
+  getMomentum,
 } from '@/entrypoints/app/utils.ts';
 import { executeCutLoss } from './quick-sell.tsx';
 
-// Status types - added 'cancelling' and 'cut_loss'
+// Status types
 export type AutoTradeStatus =
   | 'idle'
   | 'ready'
   | 'cooling_down'
   | 'waiting_order'
   | 'cancelling'
-  | 'cut_loss';
+  | 'cut_loss'
+  | 'skipping'; // New: when algorithm conditions not met
+
+// Extended stats for display
+export interface AutoTradeStats {
+  status: AutoTradeStatus;
+  gap: number | null;
+  orderCount: number;
+  totalProfit: number;
+  momentum: number | null;
+  skipReason: string | null;
+}
 
 interface AutoTradeProps {
-  onStatusChange?: (status: AutoTradeStatus, gap: number | null, orderCount: number) => void;
+  onStatusChange?: (stats: AutoTradeStats) => void;
 }
 
 const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
@@ -34,11 +56,14 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
   const [status, setStatus] = useState<AutoTradeStatus>('idle');
   const [currentGap, setCurrentGap] = useState<number | null>(null);
   const [orderCount, setOrderCount] = useState(0);
+  const [skipReason, setSkipReason] = useState<string | null>(null);
 
   // Use refs to avoid useCallback/useEffect dependency issues
   const isRunningRef = useRef(false);
   const isCoolingDownRef = useRef(false);
   const hadOpenOrdersRef = useRef(false);
+  const lastBuyPriceRef = useRef<number | null>(null);
+  const lastSellPriceRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gapIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -48,18 +73,29 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     isRunningRef.current = isRunning;
   }, [isRunning]);
 
-  // Notify parent of status/gap/orderCount changes
+  // Notify parent of status/stats changes
   useEffect(() => {
-    onStatusChange?.(status, currentGap, orderCount);
-  }, [status, currentGap, orderCount, onStatusChange]);
+    onStatusChange?.({
+      status,
+      gap: currentGap,
+      orderCount,
+      totalProfit: getTotalProfit(),
+      momentum: getMomentum(),
+      skipReason,
+    });
+  }, [status, currentGap, orderCount, skipReason, onStatusChange]);
 
-  // Always poll gap for display, even when idle
+  // Always poll gap and update price history for display, even when idle
   useEffect(() => {
     const updateGap = () => {
       const { buyPrice, sellPrice } = getLatestPrice();
       if (buyPrice && sellPrice) {
         const gap = ((sellPrice - buyPrice) / buyPrice) * 100;
         setCurrentGap(gap);
+
+        // Add mid price to history for momentum calculation
+        const midPrice = (buyPrice + sellPrice) / 2;
+        addPriceToHistory(midPrice);
       }
     };
 
@@ -88,10 +124,15 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     return rows.length > 0;
   };
 
-  // === Trade Execution Functions (reused from quick-buy with random delays) ===
+  // === Trade Execution Functions ===
 
-  const fillBuyPrice = async (price: number) => {
-    const slippage = getBuySlippage();
+  const fillBuyPrice = async (price: number, dynamicSlippage?: number) => {
+    // Use dynamic slippage if provided and enabled, otherwise use fixed slippage
+    const slippage =
+      dynamicSlippage !== undefined && getEnableDynamicSlippage()
+        ? dynamicSlippage
+        : getBuySlippage();
+
     const buyPrice = price * (1 + slippage / 100);
     const input = document.getElementById('limitPrice');
     if (!input) {
@@ -102,10 +143,18 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     await sleep(random(30, 100));
     const event = new Event('input', { bubbles: true });
     input.dispatchEvent(event);
+
+    // Store for profit tracking
+    lastBuyPriceRef.current = buyPrice;
   };
 
-  const fillSellPrice = async (price: number) => {
-    const slippage = getSellSlippage();
+  const fillSellPrice = async (price: number, dynamicSlippage?: number) => {
+    // Use dynamic slippage if provided and enabled, otherwise use fixed slippage
+    const slippage =
+      dynamicSlippage !== undefined && getEnableDynamicSlippage()
+        ? dynamicSlippage
+        : getSellSlippage();
+
     const sellPrice = price * (1 - slippage / 100);
     const inputs = document.querySelectorAll('#limitTotal');
     const input = inputs[1];
@@ -117,6 +166,9 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     await sleep(random(30, 100));
     const event = new Event('input', { bubbles: true });
     input.dispatchEvent(event);
+
+    // Store for profit tracking
+    lastSellPriceRef.current = sellPrice;
   };
 
   const fillVolume = async () => {
@@ -173,7 +225,7 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
 
   // === Main Auto Trade Execution ===
 
-  const executeAutoTrade = async () => {
+  const executeAutoTrade = async (dynamicSlippage?: number) => {
     const { buyPrice: latestBuyPrice, sellPrice: latestSellPrice } = getLatestPrice();
     if (!latestBuyPrice || !latestSellPrice) {
       console.error('Failed to get latest price for auto trade');
@@ -189,10 +241,13 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       await randomClickOrderBook();
       await sleep(random(30, 100));
 
-      await fillBuyPrice(latestSellPrice);
+      await fillBuyPrice(latestSellPrice, dynamicSlippage);
       await sleep(random(30, 100));
 
-      await fillSellPrice(useBuyPriceAsSellPrice ? latestSellPrice : latestBuyPrice);
+      await fillSellPrice(
+        useBuyPriceAsSellPrice ? latestSellPrice : latestBuyPrice,
+        dynamicSlippage
+      );
       await sleep(random(30, 100));
 
       await fillVolume();
@@ -273,6 +328,9 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     // Update current gap for display
     setCurrentGap(gap);
 
+    // Clear skip reason at start of each check
+    setSkipReason(null);
+
     // If cooling down, skip
     if (isCoolingDownRef.current) {
       return;
@@ -281,10 +339,29 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     // Track order count - check if orders just completed
     const currentlyHasOrders = hasOpenOrders();
     if (hadOpenOrdersRef.current && !currentlyHasOrders) {
-      // Cycle complete!
+      // Cycle complete! Record the trade for profit tracking
       const newCount = orderCount + 1;
       setOrderCount(newCount);
       console.log(`[AutoTrade] Order cycle complete! Count: ${newCount}`);
+
+      // Record trade profit (using stored prices)
+      if (lastBuyPriceRef.current && lastSellPriceRef.current) {
+        const volume = getVolume();
+        recordTrade(lastBuyPriceRef.current, lastSellPriceRef.current, volume);
+        lastBuyPriceRef.current = null;
+        lastSellPriceRef.current = null;
+      }
+
+      // Check max loss
+      const maxLoss = getMaxLoss();
+      const totalProfit = getTotalProfit();
+      if (totalProfit < -maxLoss) {
+        console.log(`[AutoTrade] Max loss reached (${totalProfit.toFixed(2)} USDT), stopping...`);
+        setIsRunning(false);
+        setStatus('idle');
+        setSkipReason(`Max loss reached: ${totalProfit.toFixed(2)} USDT`);
+        return;
+      }
 
       const limit = getOrderLimit();
       if (limit > 0 && newCount >= limit) {
@@ -299,12 +376,13 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     // Handle cancel/cut-loss for stale orders
     const didCancelOrCutLoss = await handleCancelAndCutLoss(buyPrice, sellPrice);
     if (didCancelOrCutLoss) {
-      // Start cooldown after cancel/cut-loss
+      // Start cooldown after cancel/cut-loss with multiplier for consecutive losses
       isCoolingDownRef.current = true;
       setStatus('cooling_down');
-      const cooldown = random(1000, 3000);
+      const multiplier = getCooldownMultiplier();
+      const cooldown = random(1000, 3000) * multiplier;
       console.log(
-        `[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s after cancel/cut-loss...`
+        `[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s after cancel/cut-loss (${multiplier.toFixed(1)}x multiplier)...`
       );
       cooldownTimeoutRef.current = setTimeout(() => {
         isCoolingDownRef.current = false;
@@ -315,26 +393,41 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
 
     // Check for open orders first
     if (currentlyHasOrders) {
-      console.log('[AutoTrade] Open orders exist, waiting for them to complete...');
       setStatus('waiting_order');
       return;
     }
 
     // Check if gap is below threshold - ready to trade
     if (absGap < threshold) {
+      // Check algorithm conditions before trading
+      const decision = checkTradeConditions(buyPrice, sellPrice);
+
+      if (!decision.canTrade) {
+        console.log(`[AutoTrade] Skipping trade: ${decision.reason}`);
+        setStatus('skipping');
+        setSkipReason(decision.reason);
+        return;
+      }
+
       console.log(
-        `[AutoTrade] Gap detected (|${gap.toFixed(4)}%| < ${threshold}%), executing trade...`
+        `[AutoTrade] Gap detected (|${gap.toFixed(4)}%| < ${threshold}%), executing trade...` +
+          (decision.dynamicSlippage
+            ? ` Dynamic slippage: ${decision.dynamicSlippage.toFixed(4)}%`
+            : '')
       );
 
       // Set cooling down to prevent immediate re-execution
       isCoolingDownRef.current = true;
       setStatus('cooling_down');
 
-      await executeAutoTrade();
+      await executeAutoTrade(decision.dynamicSlippage);
 
-      // Random cooldown 1-3 seconds
-      const cooldown = random(1000, 3000);
-      console.log(`[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s...`);
+      // Random cooldown 1-3 seconds with multiplier for consecutive losses
+      const multiplier = getCooldownMultiplier();
+      const cooldown = random(1000, 3000) * multiplier;
+      console.log(
+        `[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s (${multiplier.toFixed(1)}x multiplier)...`
+      );
 
       cooldownTimeoutRef.current = setTimeout(() => {
         console.log('[AutoTrade] Cooldown complete, ready to trade again');
@@ -392,16 +485,22 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
 
   const handleToggle = () => {
     if (isRunning) {
-      // Stop - don't reset counter
+      // Stop - don't reset counter or profit
       console.log('[AutoTrade] Stopping...');
       setIsRunning(false);
       isCoolingDownRef.current = false;
       setStatus('idle');
+      setSkipReason(null);
     } else {
-      // Start - reset counter
+      // Start - reset counter and profit tracking
       console.log('[AutoTrade] Starting...');
       setOrderCount(0);
       hadOpenOrdersRef.current = false;
+      lastBuyPriceRef.current = null;
+      lastSellPriceRef.current = null;
+      clearTradeHistory();
+      clearPriceHistory();
+      setSkipReason(null);
       setIsRunning(true);
       isCoolingDownRef.current = false;
       setStatus('ready');
