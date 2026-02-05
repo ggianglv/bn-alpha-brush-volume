@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Popover, Checkbox, NumberInput, Button } from '@mantine/core';
 import { IconSettings } from '@tabler/icons-react';
-import { DEFAULT_BUY_SLIPPAGE, DEFAULT_SELL_SLIPPAGE, DEFAULT_VOLUME } from '@/entrypoints/app/constants.ts';
+import {
+  DEFAULT_BUY_SLIPPAGE,
+  DEFAULT_SELL_SLIPPAGE,
+  DEFAULT_VOLUME,
+  DEFAULT_GAP_THRESHOLD,
+} from '@/entrypoints/app/constants.ts';
 import { saveSettings, getSavedSettings } from '@/entrypoints/app/utils.ts';
 
 const Setting = () => {
@@ -9,6 +14,7 @@ const Setting = () => {
   const [sellSlippage, setSellSlippage] = useState<number | string>(DEFAULT_SELL_SLIPPAGE);
   const [volume, setVolume] = useState<number | string>(DEFAULT_VOLUME);
   const [useBuyPriceAsSellPrice, setUseBuyPriceAsSellPrice] = useState<boolean>(false);
+  const [gapThreshold, setGapThreshold] = useState<number | string>(DEFAULT_GAP_THRESHOLD);
   const [opened, setOpened] = useState(false);
 
   useEffect(() => {
@@ -17,6 +23,7 @@ const Setting = () => {
     setSellSlippage(settings.sellSlippage);
     setVolume(settings.volume);
     setUseBuyPriceAsSellPrice(settings.useBuyPriceAsSellPrice);
+    setGapThreshold(settings.gapThreshold);
   }, []);
 
   const handleSave = () => {
@@ -24,9 +31,10 @@ const Setting = () => {
       buySlippage,
       sellSlippage,
       volume,
-      useBuyPriceAsSellPrice
+      useBuyPriceAsSellPrice,
+      gapThreshold,
     };
-    
+
     const success = saveSettings(settings);
     if (success) {
       setOpened(false);
@@ -39,9 +47,21 @@ const Setting = () => {
   };
 
   return (
-    <Popover width={300} trapFocus position="top-end" withArrow shadow="md" opened={opened} onChange={setOpened}>
+    <Popover
+      width={300}
+      trapFocus
+      position="top-end"
+      withArrow
+      shadow="md"
+      opened={opened}
+      onChange={setOpened}
+    >
       <Popover.Target>
-        <IconSettings size={20} style={{ cursor: 'pointer', flexShrink: 0, color: '#ffffff' }} onClick={() => setOpened((o) => !o)} />
+        <IconSettings
+          size={20}
+          style={{ cursor: 'pointer', flexShrink: 0, color: '#ffffff' }}
+          onClick={() => setOpened((o) => !o)}
+        />
       </Popover.Target>
       <Popover.Dropdown>
         <div>
@@ -69,6 +89,16 @@ const Setting = () => {
             placeholder="Volume"
             size="xs"
           />
+          <NumberInput
+            value={gapThreshold}
+            onChange={setGapThreshold}
+            style={{ marginTop: '8px' }}
+            label="Auto-trade gap threshold (%)"
+            placeholder="Gap threshold (%)"
+            size="xs"
+            step={0.1}
+            min={0}
+          />
           <Checkbox
             checked={useBuyPriceAsSellPrice}
             onChange={(event) => setUseBuyPriceAsSellPrice(event.currentTarget.checked)}
@@ -78,8 +108,12 @@ const Setting = () => {
           />
 
           <div style={{ marginTop: '16px', marginBottom: '8px', display: 'flex', gap: '8px' }}>
-            <Button size="xs" onClick={handleSave}>Save</Button>
-            <Button size="xs" variant="outline" onClick={handleCancel}>Cancel</Button>
+            <Button size="xs" onClick={handleSave}>
+              Save
+            </Button>
+            <Button size="xs" variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
           </div>
         </div>
       </Popover.Dropdown>

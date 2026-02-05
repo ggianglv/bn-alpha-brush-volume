@@ -1,4 +1,9 @@
-import { DEFAULT_BUY_SLIPPAGE, DEFAULT_SELL_SLIPPAGE, DEFAULT_VOLUME } from './constants';
+import {
+  DEFAULT_BUY_SLIPPAGE,
+  DEFAULT_SELL_SLIPPAGE,
+  DEFAULT_VOLUME,
+  DEFAULT_GAP_THRESHOLD,
+} from './constants';
 
 export const waitForElm = (selector: string) => {
   return new Promise((resolve) => {
@@ -27,6 +32,7 @@ export interface SavedSettings {
   sellSlippage: number | string;
   volume: number | string;
   useBuyPriceAsSellPrice: boolean;
+  gapThreshold: number | string;
 }
 
 export const getSavedSettings = (): SavedSettings => {
@@ -39,6 +45,7 @@ export const getSavedSettings = (): SavedSettings => {
         sellSlippage: settings.sellSlippage ?? DEFAULT_SELL_SLIPPAGE,
         volume: settings.volume ?? DEFAULT_VOLUME,
         useBuyPriceAsSellPrice: settings.useBuyPriceAsSellPrice ?? false,
+        gapThreshold: settings.gapThreshold ?? DEFAULT_GAP_THRESHOLD,
       };
     }
   } catch (error) {
@@ -50,6 +57,7 @@ export const getSavedSettings = (): SavedSettings => {
     sellSlippage: DEFAULT_SELL_SLIPPAGE,
     volume: DEFAULT_VOLUME,
     useBuyPriceAsSellPrice: false,
+    gapThreshold: DEFAULT_GAP_THRESHOLD,
   };
 };
 
@@ -67,6 +75,10 @@ export const getVolume = (): number => {
 
 export const getUseBuyPriceAsSellPrice = (): boolean => {
   return getSavedSettings().useBuyPriceAsSellPrice;
+};
+
+export const getGapThreshold = (): number => {
+  return Number(getSavedSettings().gapThreshold);
 };
 
 export const saveSettings = (settings: SavedSettings): boolean => {
