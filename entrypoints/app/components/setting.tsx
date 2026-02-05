@@ -123,7 +123,7 @@ const Setting = () => {
           onClick={() => setOpened((o) => !o)}
         />
       </Popover.Target>
-      <Popover.Dropdown style={{ maxHeight: '320px' }}>
+      <Popover.Dropdown style={{ maxHeight: '450px' }}>
         <Tabs defaultValue="basic">
           <Tabs.List grow>
             <Tabs.Tab value="basic" size="xs">
@@ -135,7 +135,7 @@ const Setting = () => {
           </Tabs.List>
 
           {/* Basic Trading Settings Tab */}
-          <Tabs.Panel value="basic" pt="xs" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+          <Tabs.Panel value="basic" pt="xs" style={{ maxHeight: '350px', overflowY: 'auto' }}>
             <NumberInput
               value={buySlippage}
               onChange={setBuySlippage}
@@ -201,7 +201,7 @@ const Setting = () => {
           </Tabs.Panel>
 
           {/* Algorithm Settings Tab */}
-          <Tabs.Panel value="algorithm" pt="xs" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+          <Tabs.Panel value="algorithm" pt="xs" style={{ maxHeight: '350px', overflowY: 'auto' }}>
             <NumberInput
               value={maxLoss}
               onChange={setMaxLoss}
