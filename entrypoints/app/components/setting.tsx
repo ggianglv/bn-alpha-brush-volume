@@ -106,6 +106,25 @@ const Setting = () => {
     setOpened(false);
   };
 
+  const handleReset = () => {
+    // Reset all settings to defaults
+    setBuySlippage(DEFAULT_BUY_SLIPPAGE);
+    setSellSlippage(DEFAULT_SELL_SLIPPAGE);
+    setVolume(DEFAULT_VOLUME);
+    setUseBuyPriceAsSellPrice(false);
+    setGapThreshold(DEFAULT_GAP_THRESHOLD);
+    setCancelThreshold(DEFAULT_CANCEL_THRESHOLD);
+    setOrderLimit(DEFAULT_ORDER_LIMIT);
+    setMaxLoss(DEFAULT_MAX_LOSS);
+    setEnableMomentumCheck(DEFAULT_ENABLE_MOMENTUM_CHECK);
+    setMomentumThreshold(DEFAULT_MOMENTUM_THRESHOLD);
+    setEnableDynamicSlippage(DEFAULT_ENABLE_DYNAMIC_SLIPPAGE);
+    setDynamicSlippageFactor(DEFAULT_DYNAMIC_SLIPPAGE_FACTOR);
+    setMinSlippage(DEFAULT_MIN_SLIPPAGE);
+    setEnableOrderBookCheck(DEFAULT_ENABLE_ORDER_BOOK_CHECK);
+    setOrderBookRatioThreshold(DEFAULT_ORDER_BOOK_RATIO_THRESHOLD);
+  };
+
   return (
     <Popover
       width={320}
@@ -289,13 +308,16 @@ const Setting = () => {
           </Tabs.Panel>
         </Tabs>
 
-        {/* Save/Cancel buttons - always visible */}
+        {/* Save/Cancel/Reset buttons - always visible */}
         <div style={{ marginTop: '16px', marginBottom: '8px', display: 'flex', gap: '8px' }}>
           <Button size="xs" onClick={handleSave}>
             Save
           </Button>
           <Button size="xs" variant="outline" onClick={handleCancel}>
             Cancel
+          </Button>
+          <Button size="xs" variant="light" color="gray" onClick={handleReset}>
+            Reset
           </Button>
         </div>
       </Popover.Dropdown>
