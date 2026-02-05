@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Popover, Checkbox, NumberInput, Button, Divider, Text } from '@mantine/core';
+import { Popover, Checkbox, NumberInput, Button, Tabs } from '@mantine/core';
 import { IconSettings } from '@tabler/icons-react';
 import {
   DEFAULT_BUY_SLIPPAGE,
@@ -123,175 +123,180 @@ const Setting = () => {
           onClick={() => setOpened((o) => !o)}
         />
       </Popover.Target>
-      <Popover.Dropdown style={{ maxHeight: '400px', overflowY: 'auto' }}>
-        <div>
-          {/* Basic Trading Settings */}
-          <Text size="xs" fw={600} c="dimmed">
-            Basic Trading
-          </Text>
-          <NumberInput
-            value={buySlippage}
-            onChange={setBuySlippage}
-            style={{ marginTop: '8px' }}
-            label="Buy slippage (%)"
-            placeholder="Buy slippage (%)"
-            size="xs"
-            step={0.01}
-          />
-          <NumberInput
-            value={sellSlippage}
-            onChange={setSellSlippage}
-            style={{ marginTop: '8px' }}
-            label="Sell slippage (%)"
-            placeholder="Sell slippage (%)"
-            size="xs"
-            step={0.01}
-          />
-          <NumberInput
-            value={volume}
-            onChange={setVolume}
-            style={{ marginTop: '8px' }}
-            label="Volume (USDT)"
-            placeholder="Volume"
-            size="xs"
-          />
-          <NumberInput
-            value={gapThreshold}
-            onChange={setGapThreshold}
-            style={{ marginTop: '8px' }}
-            label="Gap threshold (%)"
-            placeholder="Gap threshold (%)"
-            size="xs"
-            step={0.1}
-            min={0}
-          />
-          <NumberInput
-            value={cancelThreshold}
-            onChange={setCancelThreshold}
-            style={{ marginTop: '8px' }}
-            label="Cancel order threshold (%)"
-            placeholder="Cancel threshold (%)"
-            size="xs"
-            step={0.1}
-            min={0}
-          />
-          <NumberInput
-            value={orderLimit}
-            onChange={setOrderLimit}
-            style={{ marginTop: '8px' }}
-            label="Order limit (0 = unlimited)"
-            placeholder="Order limit"
-            size="xs"
-            min={0}
-          />
-          <Checkbox
-            checked={useBuyPriceAsSellPrice}
-            onChange={(event) => setUseBuyPriceAsSellPrice(event.currentTarget.checked)}
-            style={{ marginTop: '12px' }}
-            label="Use buy price as sell price"
-            size="xs"
-          />
+      <Popover.Dropdown>
+        <Tabs defaultValue="basic">
+          <Tabs.List grow>
+            <Tabs.Tab value="basic" size="xs">
+              Basic
+            </Tabs.Tab>
+            <Tabs.Tab value="algorithm" size="xs">
+              Algorithm
+            </Tabs.Tab>
+          </Tabs.List>
 
-          <Divider my="md" />
-
-          {/* Algorithm Settings */}
-          <Text size="xs" fw={600} c="dimmed">
-            Algorithm Settings
-          </Text>
-
-          <NumberInput
-            value={maxLoss}
-            onChange={setMaxLoss}
-            style={{ marginTop: '8px' }}
-            label="Max loss (USDT) - stops when reached"
-            placeholder="Max loss"
-            size="xs"
-            min={0}
-          />
-
-          {/* Momentum Check */}
-          <Checkbox
-            checked={enableMomentumCheck}
-            onChange={(event) => setEnableMomentumCheck(event.currentTarget.checked)}
-            style={{ marginTop: '12px' }}
-            label="Enable momentum check"
-            size="xs"
-          />
-          {enableMomentumCheck && (
+          {/* Basic Trading Settings Tab */}
+          <Tabs.Panel value="basic" pt="xs">
             <NumberInput
-              value={momentumThreshold}
-              onChange={setMomentumThreshold}
+              value={buySlippage}
+              onChange={setBuySlippage}
               style={{ marginTop: '8px' }}
-              label="Momentum threshold (%) - skip if below"
-              placeholder="Momentum threshold"
+              label="Buy slippage (%)"
+              placeholder="Buy slippage (%)"
               size="xs"
-              step={0.1}
+              step={0.01}
             />
-          )}
-
-          {/* Dynamic Slippage */}
-          <Checkbox
-            checked={enableDynamicSlippage}
-            onChange={(event) => setEnableDynamicSlippage(event.currentTarget.checked)}
-            style={{ marginTop: '12px' }}
-            label="Enable dynamic slippage (auto mode)"
-            size="xs"
-          />
-          {enableDynamicSlippage && (
-            <>
-              <NumberInput
-                value={dynamicSlippageFactor}
-                onChange={setDynamicSlippageFactor}
-                style={{ marginTop: '8px' }}
-                label="Dynamic slippage factor (% of spread)"
-                placeholder="Factor"
-                size="xs"
-                step={0.1}
-                min={0}
-                max={1}
-              />
-              <NumberInput
-                value={minSlippage}
-                onChange={setMinSlippage}
-                style={{ marginTop: '8px' }}
-                label="Minimum slippage (%)"
-                placeholder="Min slippage"
-                size="xs"
-                step={0.01}
-                min={0}
-              />
-            </>
-          )}
-
-          {/* Order Book Check */}
-          <Checkbox
-            checked={enableOrderBookCheck}
-            onChange={(event) => setEnableOrderBookCheck(event.currentTarget.checked)}
-            style={{ marginTop: '12px' }}
-            label="Enable order book analysis"
-            size="xs"
-          />
-          {enableOrderBookCheck && (
             <NumberInput
-              value={orderBookRatioThreshold}
-              onChange={setOrderBookRatioThreshold}
+              value={sellSlippage}
+              onChange={setSellSlippage}
               style={{ marginTop: '8px' }}
-              label="Min buy/sell ratio - skip if below"
-              placeholder="Ratio threshold"
+              label="Sell slippage (%)"
+              placeholder="Sell slippage (%)"
+              size="xs"
+              step={0.01}
+            />
+            <NumberInput
+              value={volume}
+              onChange={setVolume}
+              style={{ marginTop: '8px' }}
+              label="Volume (USDT)"
+              placeholder="Volume"
+              size="xs"
+            />
+            <NumberInput
+              value={gapThreshold}
+              onChange={setGapThreshold}
+              style={{ marginTop: '8px' }}
+              label="Gap threshold (%)"
+              placeholder="Gap threshold (%)"
               size="xs"
               step={0.1}
               min={0}
             />
-          )}
+            <NumberInput
+              value={cancelThreshold}
+              onChange={setCancelThreshold}
+              style={{ marginTop: '8px' }}
+              label="Cancel order threshold (%)"
+              placeholder="Cancel threshold (%)"
+              size="xs"
+              step={0.1}
+              min={0}
+            />
+            <NumberInput
+              value={orderLimit}
+              onChange={setOrderLimit}
+              style={{ marginTop: '8px' }}
+              label="Order limit (0 = unlimited)"
+              placeholder="Order limit"
+              size="xs"
+              min={0}
+            />
+            <Checkbox
+              checked={useBuyPriceAsSellPrice}
+              onChange={(event) => setUseBuyPriceAsSellPrice(event.currentTarget.checked)}
+              style={{ marginTop: '12px' }}
+              label="Use buy price as sell price"
+              size="xs"
+            />
+          </Tabs.Panel>
 
-          <div style={{ marginTop: '16px', marginBottom: '8px', display: 'flex', gap: '8px' }}>
-            <Button size="xs" onClick={handleSave}>
-              Save
-            </Button>
-            <Button size="xs" variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
-          </div>
+          {/* Algorithm Settings Tab */}
+          <Tabs.Panel value="algorithm" pt="xs">
+            <NumberInput
+              value={maxLoss}
+              onChange={setMaxLoss}
+              style={{ marginTop: '8px' }}
+              label="Max loss (USDT)"
+              placeholder="Max loss"
+              size="xs"
+              min={0}
+            />
+
+            {/* Momentum Check */}
+            <Checkbox
+              checked={enableMomentumCheck}
+              onChange={(event) => setEnableMomentumCheck(event.currentTarget.checked)}
+              style={{ marginTop: '12px' }}
+              label="Enable momentum check"
+              size="xs"
+            />
+            {enableMomentumCheck && (
+              <NumberInput
+                value={momentumThreshold}
+                onChange={setMomentumThreshold}
+                style={{ marginTop: '8px' }}
+                label="Momentum threshold (%)"
+                placeholder="Momentum threshold"
+                size="xs"
+                step={0.1}
+              />
+            )}
+
+            {/* Dynamic Slippage */}
+            <Checkbox
+              checked={enableDynamicSlippage}
+              onChange={(event) => setEnableDynamicSlippage(event.currentTarget.checked)}
+              style={{ marginTop: '12px' }}
+              label="Enable dynamic slippage"
+              size="xs"
+            />
+            {enableDynamicSlippage && (
+              <>
+                <NumberInput
+                  value={dynamicSlippageFactor}
+                  onChange={setDynamicSlippageFactor}
+                  style={{ marginTop: '8px' }}
+                  label="Slippage factor (% of spread)"
+                  placeholder="Factor"
+                  size="xs"
+                  step={0.1}
+                  min={0}
+                  max={1}
+                />
+                <NumberInput
+                  value={minSlippage}
+                  onChange={setMinSlippage}
+                  style={{ marginTop: '8px' }}
+                  label="Min slippage (%)"
+                  placeholder="Min slippage"
+                  size="xs"
+                  step={0.01}
+                  min={0}
+                />
+              </>
+            )}
+
+            {/* Order Book Check */}
+            <Checkbox
+              checked={enableOrderBookCheck}
+              onChange={(event) => setEnableOrderBookCheck(event.currentTarget.checked)}
+              style={{ marginTop: '12px' }}
+              label="Enable order book analysis"
+              size="xs"
+            />
+            {enableOrderBookCheck && (
+              <NumberInput
+                value={orderBookRatioThreshold}
+                onChange={setOrderBookRatioThreshold}
+                style={{ marginTop: '8px' }}
+                label="Min buy/sell ratio"
+                placeholder="Ratio threshold"
+                size="xs"
+                step={0.1}
+                min={0}
+              />
+            )}
+          </Tabs.Panel>
+        </Tabs>
+
+        {/* Save/Cancel buttons - always visible */}
+        <div style={{ marginTop: '16px', marginBottom: '8px', display: 'flex', gap: '8px' }}>
+          <Button size="xs" onClick={handleSave}>
+            Save
+          </Button>
+          <Button size="xs" variant="outline" onClick={handleCancel}>
+            Cancel
+          </Button>
         </div>
       </Popover.Dropdown>
     </Popover>
