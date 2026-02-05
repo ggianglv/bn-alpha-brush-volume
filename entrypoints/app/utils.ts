@@ -466,7 +466,7 @@ export const checkTradeConditions = (buyPrice: number, sellPrice: number): Trade
   if (totalProfit < -maxLoss) {
     return {
       canTrade: false,
-      reason: `Max loss reached (${totalProfit.toFixed(2)} USDT)`,
+      reason: `Max loss (${totalProfit.toFixed(2)})`,
     };
   }
 
@@ -477,7 +477,7 @@ export const checkTradeConditions = (buyPrice: number, sellPrice: number): Trade
     if (momentum !== null && momentum < threshold) {
       return {
         canTrade: false,
-        reason: `Negative momentum (${momentum.toFixed(2)}% < ${threshold}%)`,
+        reason: `Momentum ${momentum.toFixed(2)}%`,
       };
     }
   }
@@ -489,7 +489,7 @@ export const checkTradeConditions = (buyPrice: number, sellPrice: number): Trade
     if (depth.ratio < ratioThreshold) {
       return {
         canTrade: false,
-        reason: `Order book imbalanced (ratio: ${depth.ratio.toFixed(2)} < ${ratioThreshold})`,
+        reason: `OB ratio ${depth.ratio.toFixed(2)}`,
       };
     }
   }
