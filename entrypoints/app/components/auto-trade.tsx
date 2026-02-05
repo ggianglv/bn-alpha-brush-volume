@@ -289,6 +289,9 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
         order.cancelButton.click();
         await sleep(200);
       }
+      // Clear refs to prevent false profit recording when buy order is cancelled
+      lastBuyPriceRef.current = null;
+      lastSellPriceRef.current = null;
     }
 
     // Cancel ALL stale sell orders first, then execute ONE cut-loss
@@ -305,6 +308,10 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       console.log('[AutoTrade] Executing cut-loss...');
       setStatus('cut_loss');
       await executeCutLoss();
+
+      // Clear refs - cut-loss is a separate transaction, not the original trade
+      lastBuyPriceRef.current = null;
+      lastSellPriceRef.current = null;
 
       return true; // Indicate that we did cancel/cut-loss
     }
@@ -339,36 +346,39 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     // Track order count - check if orders just completed
     const currentlyHasOrders = hasOpenOrders();
     if (hadOpenOrdersRef.current && !currentlyHasOrders) {
-      // Cycle complete! Record the trade for profit tracking
-      const newCount = orderCount + 1;
-      setOrderCount(newCount);
-      console.log(`[AutoTrade] Order cycle complete! Count: ${newCount}`);
-
-      // Record trade profit (using stored prices)
+      // Orders cleared - check if this was a successful trade cycle
+      // Only count and record if we have both buy and sell prices (trade completed, not cancelled)
       if (lastBuyPriceRef.current && lastSellPriceRef.current) {
+        const newCount = orderCount + 1;
+        setOrderCount(newCount);
+        console.log(`[AutoTrade] Trade cycle complete! Count: ${newCount}`);
+
+        // Record trade profit (using stored prices)
         const volume = getVolume();
         recordTrade(lastBuyPriceRef.current, lastSellPriceRef.current, volume);
         lastBuyPriceRef.current = null;
         lastSellPriceRef.current = null;
-      }
 
-      // Check max loss
-      const maxLoss = getMaxLoss();
-      const totalProfit = getTotalProfit();
-      if (totalProfit < -maxLoss) {
-        console.log(`[AutoTrade] Max loss reached (${totalProfit.toFixed(2)} USDT), stopping...`);
-        setIsRunning(false);
-        setStatus('idle');
-        setSkipReason(`Max loss reached: ${totalProfit.toFixed(2)} USDT`);
-        return;
-      }
+        // Check max loss
+        const maxLoss = getMaxLoss();
+        const totalProfit = getTotalProfit();
+        if (totalProfit < -maxLoss) {
+          console.log(`[AutoTrade] Max loss reached (${totalProfit.toFixed(2)} USDT), stopping...`);
+          setIsRunning(false);
+          setStatus('idle');
+          setSkipReason(`Max loss reached: ${totalProfit.toFixed(2)} USDT`);
+          return;
+        }
 
-      const limit = getOrderLimit();
-      if (limit > 0 && newCount >= limit) {
-        console.log(`[AutoTrade] Order limit reached (${newCount}/${limit}), stopping...`);
-        setIsRunning(false);
-        setStatus('idle');
-        return;
+        const limit = getOrderLimit();
+        if (limit > 0 && newCount >= limit) {
+          console.log(`[AutoTrade] Order limit reached (${newCount}/${limit}), stopping...`);
+          setIsRunning(false);
+          setStatus('idle');
+          return;
+        }
+      } else {
+        console.log('[AutoTrade] Orders cleared but no trade recorded (likely cancelled)');
       }
     }
     hadOpenOrdersRef.current = currentlyHasOrders;

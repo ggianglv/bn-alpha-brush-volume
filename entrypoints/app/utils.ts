@@ -243,16 +243,26 @@ export const getOpenOrders = (): OpenOrder[] => {
     const priceCell = row.querySelector('[aria-colindex="5"]');
     const cancelCell = row.querySelector('[aria-colindex="11"]');
 
-    if (!typeCell || !priceCell || !cancelCell) return;
+    if (!typeCell || !priceCell || !cancelCell) {
+      console.warn('[getOpenOrders] Missing cells in row, DOM structure may have changed');
+      return;
+    }
 
     const type = typeCell.textContent?.trim() as 'Buy' | 'Sell';
     const priceText = priceCell.textContent?.trim() || '0';
     const price = parseFloat(priceText.replace(/[^\d.]/g, ''));
     const cancelButton = cancelCell.querySelector('svg')?.closest('div') as HTMLElement;
 
-    if (type && price && cancelButton) {
-      orders.push({ type, price, cancelButton });
+    if (!type || !price || !cancelButton) {
+      console.warn('[getOpenOrders] Failed to parse order data:', {
+        type,
+        price,
+        hasCancelButton: !!cancelButton,
+      });
+      return;
     }
+
+    orders.push({ type, price, cancelButton });
   });
 
   return orders;

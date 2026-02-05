@@ -50,7 +50,7 @@ const fillPriceWithSlippage = (slippagePercent: number) => {
 };
 
 const fillAmount = () => {
-  const element = document.querySelector('.text-TertiaryText  .text-PrimaryText');
+  const element = document.querySelector('.text-TertiaryText .text-PrimaryText');
   if (!element) {
     console.error('Available balance element not found');
     return;
