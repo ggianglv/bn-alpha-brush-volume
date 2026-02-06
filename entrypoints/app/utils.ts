@@ -255,12 +255,38 @@ export const random = (min: number, max: number) => {
   return Math.random() * (max - min) + min;
 };
 
+/**
+ * Simulate a real mouse click with proper events
+ * Some React/Vue apps don't respond to simple .click()
+ */
+export const simulateClick = (element: Element): void => {
+  const mouseDownEvent = new MouseEvent('mousedown', {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+  });
+  const mouseUpEvent = new MouseEvent('mouseup', {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+  });
+  const clickEvent = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+  });
+
+  element.dispatchEvent(mouseDownEvent);
+  element.dispatchEvent(mouseUpEvent);
+  element.dispatchEvent(clickEvent);
+};
+
 // === Open Orders ===
 
 export interface OpenOrder {
   type: 'Buy' | 'Sell';
   price: number;
-  cancelButton: HTMLElement;
+  cancelButton: Element;
 }
 
 export const getOpenOrders = (): OpenOrder[] => {
@@ -282,7 +308,7 @@ export const getOpenOrders = (): OpenOrder[] => {
     const type = typeCell.textContent?.trim() as 'Buy' | 'Sell';
     const priceText = priceCell.textContent?.trim() || '0';
     const price = parseFloat(priceText.replace(/[^\d.]/g, ''));
-    const cancelButton = cancelCell.querySelector('svg')?.closest('div') as HTMLElement;
+    const cancelButton = cancelCell.querySelector('svg') as Element;
 
     if (!type || !price || !cancelButton) {
       console.warn('[getOpenOrders] Failed to parse order data:', {

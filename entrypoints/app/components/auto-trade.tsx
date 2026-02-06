@@ -15,6 +15,7 @@ import {
   getLatestPrice,
   getOpenOrders,
   random,
+  simulateClick,
   // Algorithm helpers
   addPriceToHistory,
   clearPriceHistory,
@@ -276,8 +277,8 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     );
     for (const order of sellOrders) {
       console.log(`[AutoTrade] Cancelling SELL order at ${order.price}`);
-      order.cancelButton.click();
-      await sleep(200);
+      simulateClick(order.cancelButton);
+      await sleep(300);
     }
 
     return true;
@@ -301,11 +302,13 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     setStatus('cut_loss');
     setSkipReason(`Proactive: ${decision.reason}`);
 
-    // Cancel all sell orders first
+    // Cancel the open sell orders first (press trash icon)
     await cancelAllSellOrders();
-    await sleep(300);
 
-    // Execute cut-loss
+    // Wait for orders to be fully cancelled
+    await sleep(500);
+
+    // Then execute cut-loss sell
     await executeCutLoss();
 
     // Clear refs - this is an emergency exit, not a normal trade
@@ -339,7 +342,7 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       setStatus('cancelling');
       for (const order of staleBuyOrders) {
         console.log(`[AutoTrade] Cancelling BUY order at ${order.price}`);
-        order.cancelButton.click();
+        simulateClick(order.cancelButton);
         await sleep(200);
       }
       // Clear refs to prevent false profit recording when buy order is cancelled
@@ -353,7 +356,7 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       setStatus('cancelling');
       for (const order of staleSellOrders) {
         console.log(`[AutoTrade] Cancelling SELL order at ${order.price}`);
-        order.cancelButton.click();
+        simulateClick(order.cancelButton);
         await sleep(200);
       }
 
