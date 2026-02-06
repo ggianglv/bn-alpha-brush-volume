@@ -16,6 +16,11 @@ export const DEFAULT_MIN_SLIPPAGE = 0.03;
 export const DEFAULT_ENABLE_ORDER_BOOK_CHECK = true;
 export const DEFAULT_ORDER_BOOK_RATIO_THRESHOLD = 0.8; // Stricter - need strong buy pressure
 
+// === Proactive Cut-Loss Settings ===
+export const DEFAULT_ENABLE_PROACTIVE_CUT_LOSS = true;
+export const DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD = -1; // Emergency cut-loss when price crashing (-1%)
+export const DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD = 0.3; // Emergency cut-loss when heavy sell pressure
+
 // === Price History Settings ===
 export const PRICE_HISTORY_SIZE = 20;
 export const MOMENTUM_SAMPLE_SIZE = 5;

@@ -13,6 +13,9 @@ import {
   DEFAULT_MIN_SLIPPAGE,
   DEFAULT_ENABLE_ORDER_BOOK_CHECK,
   DEFAULT_ORDER_BOOK_RATIO_THRESHOLD,
+  DEFAULT_ENABLE_PROACTIVE_CUT_LOSS,
+  DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
+  DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
   PRICE_HISTORY_SIZE,
   MOMENTUM_SAMPLE_SIZE,
   VOLATILITY_SAMPLE_SIZE,
@@ -72,6 +75,10 @@ export interface SavedSettings {
   minSlippage: number | string;
   enableOrderBookCheck: boolean;
   orderBookRatioThreshold: number | string;
+  // Proactive cut-loss settings
+  enableProactiveCutLoss: boolean;
+  proactiveMomentumThreshold: number | string;
+  proactiveOrderBookThreshold: number | string;
 }
 
 export const getSavedSettings = (): SavedSettings => {
@@ -98,6 +105,13 @@ export const getSavedSettings = (): SavedSettings => {
         enableOrderBookCheck: settings.enableOrderBookCheck ?? DEFAULT_ENABLE_ORDER_BOOK_CHECK,
         orderBookRatioThreshold:
           settings.orderBookRatioThreshold ?? DEFAULT_ORDER_BOOK_RATIO_THRESHOLD,
+        // Proactive cut-loss settings
+        enableProactiveCutLoss:
+          settings.enableProactiveCutLoss ?? DEFAULT_ENABLE_PROACTIVE_CUT_LOSS,
+        proactiveMomentumThreshold:
+          settings.proactiveMomentumThreshold ?? DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
+        proactiveOrderBookThreshold:
+          settings.proactiveOrderBookThreshold ?? DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
       };
     }
   } catch (error) {
@@ -120,6 +134,9 @@ export const getSavedSettings = (): SavedSettings => {
     minSlippage: DEFAULT_MIN_SLIPPAGE,
     enableOrderBookCheck: DEFAULT_ENABLE_ORDER_BOOK_CHECK,
     orderBookRatioThreshold: DEFAULT_ORDER_BOOK_RATIO_THRESHOLD,
+    enableProactiveCutLoss: DEFAULT_ENABLE_PROACTIVE_CUT_LOSS,
+    proactiveMomentumThreshold: DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
+    proactiveOrderBookThreshold: DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
   };
 };
 
@@ -185,6 +202,20 @@ export const getEnableOrderBookCheck = (): boolean => {
 
 export const getOrderBookRatioThreshold = (): number => {
   return Number(getSavedSettings().orderBookRatioThreshold);
+};
+
+// === Proactive Cut-Loss Settings Getters ===
+
+export const getEnableProactiveCutLoss = (): boolean => {
+  return getSavedSettings().enableProactiveCutLoss;
+};
+
+export const getProactiveMomentumThreshold = (): number => {
+  return Number(getSavedSettings().proactiveMomentumThreshold);
+};
+
+export const getProactiveOrderBookThreshold = (): number => {
+  return Number(getSavedSettings().proactiveOrderBookThreshold);
 };
 
 export const saveSettings = (settings: SavedSettings): boolean => {
@@ -505,6 +536,45 @@ export const checkTradeConditions = (buyPrice: number, sellPrice: number): Trade
     reason: 'All conditions passed',
     dynamicSlippage,
   };
+};
+
+// === Proactive Cut-Loss Decision ===
+
+export interface ProactiveCutLossDecision {
+  shouldCutLoss: boolean;
+  reason: string;
+}
+
+/**
+ * Check if we should proactively cut-loss based on market conditions
+ * This is checked when we have open sell orders to protect against sudden crashes
+ */
+export const checkProactiveCutLoss = (): ProactiveCutLossDecision => {
+  if (!getEnableProactiveCutLoss()) {
+    return { shouldCutLoss: false, reason: 'Disabled' };
+  }
+
+  // Check momentum - extreme negative momentum indicates price crash
+  const momentum = getMomentum();
+  const momentumThreshold = getProactiveMomentumThreshold();
+  if (momentum !== null && momentum < momentumThreshold) {
+    return {
+      shouldCutLoss: true,
+      reason: `Momentum crash: ${momentum.toFixed(2)}% < ${momentumThreshold}%`,
+    };
+  }
+
+  // Check order book - extreme sell pressure
+  const depth = getOrderBookDepth();
+  const orderBookThreshold = getProactiveOrderBookThreshold();
+  if (depth.ratio < orderBookThreshold && depth.sellVolume > 0) {
+    return {
+      shouldCutLoss: true,
+      reason: `Heavy sell pressure: ratio ${depth.ratio.toFixed(2)} < ${orderBookThreshold}`,
+    };
+  }
+
+  return { shouldCutLoss: false, reason: 'Conditions OK' };
 };
 
 /**

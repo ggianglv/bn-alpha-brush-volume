@@ -16,6 +16,9 @@ import {
   DEFAULT_MIN_SLIPPAGE,
   DEFAULT_ENABLE_ORDER_BOOK_CHECK,
   DEFAULT_ORDER_BOOK_RATIO_THRESHOLD,
+  DEFAULT_ENABLE_PROACTIVE_CUT_LOSS,
+  DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
+  DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
 } from '@/entrypoints/app/constants.ts';
 import { saveSettings, getSavedSettings } from '@/entrypoints/app/utils.ts';
 
@@ -51,6 +54,17 @@ const Setting = () => {
     DEFAULT_ORDER_BOOK_RATIO_THRESHOLD
   );
 
+  // Proactive cut-loss settings
+  const [enableProactiveCutLoss, setEnableProactiveCutLoss] = useState<boolean>(
+    DEFAULT_ENABLE_PROACTIVE_CUT_LOSS
+  );
+  const [proactiveMomentumThreshold, setProactiveMomentumThreshold] = useState<number | string>(
+    DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD
+  );
+  const [proactiveOrderBookThreshold, setProactiveOrderBookThreshold] = useState<number | string>(
+    DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD
+  );
+
   const [opened, setOpened] = useState(false);
 
   useEffect(() => {
@@ -72,6 +86,10 @@ const Setting = () => {
     setMinSlippage(settings.minSlippage);
     setEnableOrderBookCheck(settings.enableOrderBookCheck);
     setOrderBookRatioThreshold(settings.orderBookRatioThreshold);
+    // Proactive cut-loss settings
+    setEnableProactiveCutLoss(settings.enableProactiveCutLoss);
+    setProactiveMomentumThreshold(settings.proactiveMomentumThreshold);
+    setProactiveOrderBookThreshold(settings.proactiveOrderBookThreshold);
   }, []);
 
   const handleSave = () => {
@@ -93,6 +111,10 @@ const Setting = () => {
       minSlippage,
       enableOrderBookCheck,
       orderBookRatioThreshold,
+      // Proactive cut-loss settings
+      enableProactiveCutLoss,
+      proactiveMomentumThreshold,
+      proactiveOrderBookThreshold,
     };
 
     const success = saveSettings(settings);
@@ -123,6 +145,9 @@ const Setting = () => {
     setMinSlippage(DEFAULT_MIN_SLIPPAGE);
     setEnableOrderBookCheck(DEFAULT_ENABLE_ORDER_BOOK_CHECK);
     setOrderBookRatioThreshold(DEFAULT_ORDER_BOOK_RATIO_THRESHOLD);
+    setEnableProactiveCutLoss(DEFAULT_ENABLE_PROACTIVE_CUT_LOSS);
+    setProactiveMomentumThreshold(DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD);
+    setProactiveOrderBookThreshold(DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD);
   };
 
   return (
@@ -304,6 +329,40 @@ const Setting = () => {
                 step={0.1}
                 min={0}
               />
+            )}
+
+            {/* Proactive Cut-Loss */}
+            <Checkbox
+              checked={enableProactiveCutLoss}
+              onChange={(event) => setEnableProactiveCutLoss(event.currentTarget.checked)}
+              style={{ marginTop: '12px' }}
+              label="Enable proactive cut-loss"
+              size="xs"
+            />
+            {enableProactiveCutLoss && (
+              <>
+                <NumberInput
+                  value={proactiveMomentumThreshold}
+                  onChange={setProactiveMomentumThreshold}
+                  style={{ marginTop: '8px' }}
+                  label="Momentum threshold (%)"
+                  description="Cut-loss when momentum drops below"
+                  placeholder="-1"
+                  size="xs"
+                  step={0.1}
+                />
+                <NumberInput
+                  value={proactiveOrderBookThreshold}
+                  onChange={setProactiveOrderBookThreshold}
+                  style={{ marginTop: '8px' }}
+                  label="Order book ratio threshold"
+                  description="Cut-loss when buy/sell ratio drops below"
+                  placeholder="0.3"
+                  size="xs"
+                  step={0.1}
+                  min={0}
+                />
+              </>
             )}
           </Tabs.Panel>
         </Tabs>

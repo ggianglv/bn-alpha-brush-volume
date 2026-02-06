@@ -19,6 +19,7 @@ import {
   addPriceToHistory,
   clearPriceHistory,
   checkTradeConditions,
+  checkProactiveCutLoss,
   getCooldownMultiplier,
   getTotalProfit,
   recordTrade,
@@ -262,6 +263,58 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
 
   // === Cancel/Cut-Loss Logic ===
 
+  const cancelAllSellOrders = async (): Promise<boolean> => {
+    const openOrders = getOpenOrders();
+    const sellOrders = openOrders.filter((o) => o.type === 'Sell');
+
+    if (sellOrders.length === 0) {
+      return false;
+    }
+
+    console.log(
+      `[AutoTrade] Cancelling ${sellOrders.length} SELL order(s) for proactive cut-loss...`
+    );
+    for (const order of sellOrders) {
+      console.log(`[AutoTrade] Cancelling SELL order at ${order.price}`);
+      order.cancelButton.click();
+      await sleep(200);
+    }
+
+    return true;
+  };
+
+  const handleProactiveCutLoss = async (): Promise<boolean> => {
+    // Only check when we have open sell orders (meaning we hold tokens)
+    const openOrders = getOpenOrders();
+    const hasSellOrders = openOrders.some((o) => o.type === 'Sell');
+
+    if (!hasSellOrders) {
+      return false;
+    }
+
+    const decision = checkProactiveCutLoss();
+    if (!decision.shouldCutLoss) {
+      return false;
+    }
+
+    console.log(`[AutoTrade] PROACTIVE CUT-LOSS triggered: ${decision.reason}`);
+    setStatus('cut_loss');
+    setSkipReason(`Proactive: ${decision.reason}`);
+
+    // Cancel all sell orders first
+    await cancelAllSellOrders();
+    await sleep(300);
+
+    // Execute cut-loss
+    await executeCutLoss();
+
+    // Clear refs - this is an emergency exit, not a normal trade
+    lastBuyPriceRef.current = null;
+    lastSellPriceRef.current = null;
+
+    return true;
+  };
+
   const handleCancelAndCutLoss = async (buyPrice: number, sellPrice: number): Promise<boolean> => {
     const cancelThreshold = getCancelThreshold();
     const openOrders = getOpenOrders();
@@ -382,6 +435,25 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       }
     }
     hadOpenOrdersRef.current = currentlyHasOrders;
+
+    // Check for proactive cut-loss (emergency exit when market is crashing)
+    const didProactiveCutLoss = await handleProactiveCutLoss();
+    if (didProactiveCutLoss) {
+      // Start cooldown after proactive cut-loss
+      isCoolingDownRef.current = true;
+      setStatus('cooling_down');
+      const multiplier = getCooldownMultiplier();
+      const cooldown = random(2000, 4000) * multiplier; // Longer cooldown after emergency
+      console.log(
+        `[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s after proactive cut-loss...`
+      );
+      cooldownTimeoutRef.current = setTimeout(() => {
+        isCoolingDownRef.current = false;
+        setStatus('ready');
+        setSkipReason(null);
+      }, cooldown);
+      return;
+    }
 
     // Handle cancel/cut-loss for stale orders
     const didCancelOrCutLoss = await handleCancelAndCutLoss(buyPrice, sellPrice);
