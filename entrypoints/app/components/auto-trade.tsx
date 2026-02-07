@@ -318,6 +318,43 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
     return true;
   };
 
+  const handleProactiveCancelBuy = async (
+    buyPrice: number,
+    sellPrice: number
+  ): Promise<boolean> => {
+    // Check if we have pending buy orders
+    const openOrders = getOpenOrders();
+    const buyOrders = openOrders.filter((o) => o.type === 'Buy');
+
+    if (buyOrders.length === 0) {
+      return false;
+    }
+
+    // Check if conditions have deteriorated since we placed the buy order
+    const decision = checkTradeConditions(buyPrice, sellPrice);
+
+    // If trade conditions are no longer met, cancel the buy order
+    if (!decision.canTrade) {
+      console.log(`[AutoTrade] PROACTIVE CANCEL BUY: ${decision.reason}`);
+      setStatus('cancelling');
+      setSkipReason(`Cancel buy: ${decision.reason}`);
+
+      for (const order of buyOrders) {
+        console.log(`[AutoTrade] Cancelling BUY order at ${order.price}`);
+        simulateClick(order.cancelButton);
+        await sleep(300);
+      }
+
+      // Clear refs since we cancelled
+      lastBuyPriceRef.current = null;
+      lastSellPriceRef.current = null;
+
+      return true;
+    }
+
+    return false;
+  };
+
   const handleCancelAndCutLoss = async (buyPrice: number, sellPrice: number): Promise<boolean> => {
     const cancelThreshold = getCancelThreshold();
     const openOrders = getOpenOrders();
@@ -449,6 +486,24 @@ const AutoTrade = ({ onStatusChange }: AutoTradeProps) => {
       const cooldown = random(2000, 4000) * multiplier; // Longer cooldown after emergency
       console.log(
         `[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s after proactive cut-loss...`
+      );
+      cooldownTimeoutRef.current = setTimeout(() => {
+        isCoolingDownRef.current = false;
+        setStatus('ready');
+        setSkipReason(null);
+      }, cooldown);
+      return;
+    }
+
+    // Check for proactive cancel of buy orders (conditions deteriorated)
+    const didProactiveCancelBuy = await handleProactiveCancelBuy(buyPrice, sellPrice);
+    if (didProactiveCancelBuy) {
+      // Start cooldown after proactive cancel
+      isCoolingDownRef.current = true;
+      setStatus('cooling_down');
+      const cooldown = random(1000, 2000);
+      console.log(
+        `[AutoTrade] Cooling down for ${(cooldown / 1000).toFixed(1)}s after proactive cancel buy...`
       );
       cooldownTimeoutRef.current = setTimeout(() => {
         isCoolingDownRef.current = false;
