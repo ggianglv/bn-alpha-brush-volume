@@ -5,52 +5,56 @@ import '@mantine/core/styles.css';
 import Setting from './components/setting.tsx';
 import QuickSell from './components/quick-sell.tsx';
 import QuickBuy from './components/quick-buy.tsx';
-import AutoTrade, { AutoTradeStatus, AutoTradeStats } from './components/auto-trade.tsx';
-import { getGapThreshold, getOrderLimit } from './utils.ts';
+import AdvancedBuy, { TradingSignal, AdvancedBuyStats } from './components/advanced-buy.tsx';
+import { getGapThreshold } from './utils.ts';
 
-// Helper function to get display text for status
-const getStatusText = (status: AutoTradeStatus, skipReason: string | null): string => {
-  switch (status) {
-    case 'ready':
-      return 'Ready';
-    case 'cooling_down':
-      return 'Cooling...';
-    case 'waiting_order':
-      return 'Waiting order';
-    case 'cancelling':
-      return 'Cancelling...';
+// Helper function to get signal display text and color
+const getSignalDisplay = (
+  signal: TradingSignal,
+  reason: string | null
+): { text: string; color: string; isBold: boolean } => {
+  switch (signal) {
+    case 'buy':
+      return { text: 'BUY', color: '#2EBD85', isBold: true };
+    case 'cancel_buy':
+      return {
+        text: `CANCEL BUY ORDER${reason ? ` (${reason})` : ''}`,
+        color: '#F0B90B',
+        isBold: true,
+      };
     case 'cut_loss':
-      return 'Cut-loss...';
-    case 'skipping':
-      return skipReason ? `Skip: ${skipReason}` : 'Skipping...';
+      return {
+        text: `CUT LOSS${reason ? ` (${reason})` : ''}`,
+        color: '#F6465D',
+        isBold: true,
+      };
+    case 'none':
     default:
-      return '';
+      return { text: reason || 'Monitoring...', color: '#848e9c', isBold: false };
   }
 };
 
 const App = () => {
-  const [stats, setStats] = useState<AutoTradeStats>({
-    status: 'idle',
+  const [stats, setStats] = useState<AdvancedBuyStats>({
+    signal: 'none',
+    signalReason: null,
     gap: null,
-    orderCount: 0,
-    totalProfit: 0,
     momentum: null,
-    skipReason: null,
+    hasBuyOrders: false,
+    hasSellOrders: false,
   });
 
-  const handleStatusChange = useCallback((newStats: AutoTradeStats) => {
+  const handleSignalChange = useCallback((newStats: AdvancedBuyStats) => {
     setStats(newStats);
   }, []);
 
-  const orderLimit = getOrderLimit();
   const gapThreshold = getGapThreshold();
   const isGapGood = stats.gap !== null && Math.abs(stats.gap) < gapThreshold;
-  const isRunning = stats.status !== 'idle';
-  const isProfitable = stats.totalProfit >= 0;
+  const signalDisplay = getSignalDisplay(stats.signal, stats.signalReason);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {/* Stats display row 1 - Gap and Momentum */}
+      {/* Stats display row - Gap and Momentum */}
       <div
         style={{
           fontSize: '11px',
@@ -84,59 +88,62 @@ const App = () => {
           </>
         )}
 
-        {/* Profit/Loss - visible when running or has trades */}
-        {(isRunning || stats.totalProfit !== 0) && (
+        {/* Order status indicator */}
+        {(stats.hasBuyOrders || stats.hasSellOrders) && (
           <>
             <span>|</span>
-            <span
-              style={{
-                color: isProfitable ? '#2EBD85' : '#F6465D',
-                fontWeight: 600,
-              }}
-              title="Estimated P/L based on order prices (actual fill prices may vary)"
-            >
-              P/L: ~{stats.totalProfit >= 0 ? '+' : ''}
-              {stats.totalProfit.toFixed(4)} USDT
+            <span style={{ color: '#F0B90B' }}>
+              {stats.hasBuyOrders && stats.hasSellOrders
+                ? 'Buy+Sell orders'
+                : stats.hasBuyOrders
+                  ? 'Buy order'
+                  : 'Sell order'}
             </span>
           </>
         )}
+      </div>
 
-        {/* Order count - visible when limit > 0 or running */}
-        {(orderLimit > 0 || isRunning) && (
-          <>
-            <span>|</span>
-            <span>
-              Orders: {stats.orderCount}
-              {orderLimit > 0 ? `/${orderLimit}` : ''}
-            </span>
-          </>
-        )}
-
-        {/* Status text - only visible when running */}
-        {isRunning && (
-          <>
-            <span>|</span>
-            <span
-              style={{
-                color:
-                  stats.status === 'skipping'
-                    ? '#F0B90B'
-                    : stats.status === 'ready'
-                      ? '#2EBD85'
-                      : '#848e9c',
-              }}
-            >
-              {getStatusText(stats.status, stats.skipReason)}
-            </span>
-          </>
-        )}
+      {/* Signal display row - prominent signal indicator */}
+      <div
+        style={{
+          fontSize: '12px',
+          padding: '6px 8px',
+          borderRadius: '4px',
+          backgroundColor:
+            stats.signal === 'buy'
+              ? 'rgba(46, 189, 133, 0.15)'
+              : stats.signal === 'cancel_buy'
+                ? 'rgba(240, 185, 11, 0.15)'
+                : stats.signal === 'cut_loss'
+                  ? 'rgba(246, 70, 93, 0.15)'
+                  : 'rgba(132, 142, 156, 0.1)',
+          border: `1px solid ${
+            stats.signal === 'buy'
+              ? 'rgba(46, 189, 133, 0.3)'
+              : stats.signal === 'cancel_buy'
+                ? 'rgba(240, 185, 11, 0.3)'
+                : stats.signal === 'cut_loss'
+                  ? 'rgba(246, 70, 93, 0.3)'
+                  : 'rgba(132, 142, 156, 0.2)'
+          }`,
+        }}
+      >
+        <span
+          style={{
+            color: signalDisplay.color,
+            fontWeight: signalDisplay.isBold ? 700 : 400,
+            letterSpacing: signalDisplay.isBold ? '0.5px' : 'normal',
+          }}
+        >
+          Signal: {signalDisplay.text}
+        </span>
       </div>
 
       {/* Buttons row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <QuickSell />
         <QuickBuy />
-        <AutoTrade onStatusChange={handleStatusChange} />
+        <AdvancedBuy onSignalChange={handleSignalChange} />
         <Setting />
       </div>
     </div>
