@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@mantine/core';
+import { Button, Badge, Tooltip } from '@mantine/core';
 import {
   getBuySlippage,
   getSellSlippage,
@@ -45,6 +45,28 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
   const [hasSellOrders, setHasSellOrders] = useState(false);
 
   const monitorIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // === Badge Helper Functions ===
+
+  const getSignalBadgeText = (signal: TradingSignal): string => {
+    const signalMap = {
+      buy: 'B',
+      cancel_buy: 'C',
+      cut_loss: 'X',
+      none: '...',
+    };
+    return signalMap[signal];
+  };
+
+  const getSignalBadgeColor = (signal: TradingSignal): string => {
+    const colorMap = {
+      buy: '#2EBD85', // Green
+      cancel_buy: '#F0B90B', // Yellow
+      cut_loss: '#F6465D', // Red
+      none: '#848e9c', // Gray
+    };
+    return colorMap[signal];
+  };
 
   // === Signal Determination Logic ===
 
@@ -312,9 +334,25 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
   // === UI ===
 
   return (
-    <Button fullWidth onClick={handleAdvancedBuy} variant="outline" color="#2EBD85">
-      Advanced Buy
-    </Button>
+    <Tooltip label={signalReason || 'Monitoring...'} position="bottom" withArrow>
+      <Button fullWidth onClick={handleAdvancedBuy} variant="outline" color="#2EBD85">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>Advanced Buy</span>
+          <Badge
+            size="xs"
+            style={{
+              backgroundColor: getSignalBadgeColor(signal),
+              fontSize: '10px',
+              fontWeight: 'bold',
+              padding: '2px 6px',
+              minWidth: '20px',
+            }}
+          >
+            {getSignalBadgeText(signal)}
+          </Badge>
+        </div>
+      </Button>
+    </Tooltip>
   );
 };
 
