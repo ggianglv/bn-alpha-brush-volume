@@ -19,6 +19,9 @@ import {
   DEFAULT_ENABLE_PROACTIVE_CUT_LOSS,
   DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
   DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
+  DEFAULT_ENABLE_BLS_MODE,
+  DEFAULT_BLS_MIN_PROFIT,
+  DEFAULT_BLS_PRICE_WEIGHT,
 } from '@/entrypoints/app/constants.ts';
 import { saveSettings, getSavedSettings } from '@/entrypoints/app/utils.ts';
 
@@ -65,6 +68,11 @@ const Setting = () => {
     DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD
   );
 
+  // BLS mode settings
+  const [enableBLSMode, setEnableBLSMode] = useState<boolean>(DEFAULT_ENABLE_BLS_MODE);
+  const [blsMinProfit, setBlsMinProfit] = useState<number | string>(DEFAULT_BLS_MIN_PROFIT);
+  const [blsPriceWeight, setBlsPriceWeight] = useState<number | string>(DEFAULT_BLS_PRICE_WEIGHT);
+
   const [opened, setOpened] = useState(false);
 
   useEffect(() => {
@@ -90,6 +98,10 @@ const Setting = () => {
     setEnableProactiveCutLoss(settings.enableProactiveCutLoss);
     setProactiveMomentumThreshold(settings.proactiveMomentumThreshold);
     setProactiveOrderBookThreshold(settings.proactiveOrderBookThreshold);
+    // BLS mode settings
+    setEnableBLSMode(settings.enableBLSMode);
+    setBlsMinProfit(settings.blsMinProfit);
+    setBlsPriceWeight(settings.blsPriceWeight);
   }, []);
 
   const handleSave = () => {
@@ -115,6 +127,10 @@ const Setting = () => {
       enableProactiveCutLoss,
       proactiveMomentumThreshold,
       proactiveOrderBookThreshold,
+      // BLS mode settings
+      enableBLSMode,
+      blsMinProfit,
+      blsPriceWeight,
     };
 
     const success = saveSettings(settings);
@@ -148,6 +164,9 @@ const Setting = () => {
     setEnableProactiveCutLoss(DEFAULT_ENABLE_PROACTIVE_CUT_LOSS);
     setProactiveMomentumThreshold(DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD);
     setProactiveOrderBookThreshold(DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD);
+    setEnableBLSMode(DEFAULT_ENABLE_BLS_MODE);
+    setBlsMinProfit(DEFAULT_BLS_MIN_PROFIT);
+    setBlsPriceWeight(DEFAULT_BLS_PRICE_WEIGHT);
   };
 
   return (
@@ -364,6 +383,44 @@ const Setting = () => {
                 />
               </>
             )}
+
+            {/* Buy Low / Sell High Mode */}
+            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(132, 142, 156, 0.2)', paddingTop: '12px' }}>
+              <Checkbox
+                checked={enableBLSMode}
+                onChange={(event) => setEnableBLSMode(event.currentTarget.checked)}
+                label="Buy Low / Sell High mode"
+                description="Analyze order book to find optimal buy/sell prices"
+                size="xs"
+              />
+              {enableBLSMode && (
+                <>
+                  <NumberInput
+                    value={blsMinProfit}
+                    onChange={setBlsMinProfit}
+                    style={{ marginTop: '8px' }}
+                    label="Min profit (%)"
+                    description="Only suggest when potential profit exceeds this"
+                    placeholder="0.3"
+                    size="xs"
+                    step={0.1}
+                    min={0}
+                  />
+                  <NumberInput
+                    value={blsPriceWeight}
+                    onChange={setBlsPriceWeight}
+                    style={{ marginTop: '8px' }}
+                    label="Price weight (0=S/R, 1=VWAP)"
+                    description="Balance between support/resistance and VWAP"
+                    placeholder="0.5"
+                    size="xs"
+                    step={0.1}
+                    min={0}
+                    max={1}
+                  />
+                </>
+              )}
+            </div>
           </Tabs.Panel>
         </Tabs>
 

@@ -16,6 +16,9 @@ import {
   DEFAULT_ENABLE_PROACTIVE_CUT_LOSS,
   DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
   DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
+  DEFAULT_ENABLE_BLS_MODE,
+  DEFAULT_BLS_MIN_PROFIT,
+  DEFAULT_BLS_PRICE_WEIGHT,
   PRICE_HISTORY_SIZE,
   MOMENTUM_SAMPLE_SIZE,
   VOLATILITY_SAMPLE_SIZE,
@@ -79,6 +82,10 @@ export interface SavedSettings {
   enableProactiveCutLoss: boolean;
   proactiveMomentumThreshold: number | string;
   proactiveOrderBookThreshold: number | string;
+  // Buy Low / Sell High mode settings
+  enableBLSMode: boolean;
+  blsMinProfit: number | string;
+  blsPriceWeight: number | string;
 }
 
 export const getSavedSettings = (): SavedSettings => {
@@ -112,6 +119,10 @@ export const getSavedSettings = (): SavedSettings => {
           settings.proactiveMomentumThreshold ?? DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
         proactiveOrderBookThreshold:
           settings.proactiveOrderBookThreshold ?? DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
+        // BLS mode settings
+        enableBLSMode: settings.enableBLSMode ?? DEFAULT_ENABLE_BLS_MODE,
+        blsMinProfit: settings.blsMinProfit ?? DEFAULT_BLS_MIN_PROFIT,
+        blsPriceWeight: settings.blsPriceWeight ?? DEFAULT_BLS_PRICE_WEIGHT,
       };
     }
   } catch (error) {
@@ -137,6 +148,9 @@ export const getSavedSettings = (): SavedSettings => {
     enableProactiveCutLoss: DEFAULT_ENABLE_PROACTIVE_CUT_LOSS,
     proactiveMomentumThreshold: DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD,
     proactiveOrderBookThreshold: DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD,
+    enableBLSMode: DEFAULT_ENABLE_BLS_MODE,
+    blsMinProfit: DEFAULT_BLS_MIN_PROFIT,
+    blsPriceWeight: DEFAULT_BLS_PRICE_WEIGHT,
   };
 };
 
@@ -216,6 +230,20 @@ export const getProactiveMomentumThreshold = (): number => {
 
 export const getProactiveOrderBookThreshold = (): number => {
   return Number(getSavedSettings().proactiveOrderBookThreshold);
+};
+
+// === BLS Mode Settings Getters ===
+
+export const getEnableBLSMode = (): boolean => {
+  return getSavedSettings().enableBLSMode;
+};
+
+export const getBLSMinProfit = (): number => {
+  return Number(getSavedSettings().blsMinProfit);
+};
+
+export const getBLSPriceWeight = (): number => {
+  return Number(getSavedSettings().blsPriceWeight);
 };
 
 export const saveSettings = (settings: SavedSettings): boolean => {
@@ -609,4 +637,164 @@ export const checkProactiveCutLoss = (): ProactiveCutLossDecision => {
 export const getCooldownMultiplier = (): number => {
   const losses = getConsecutiveLosses();
   return 1 + losses * 0.5; // 1x, 1.5x, 2x, 2.5x...
+};
+
+// === Buy Low / Sell High (BLS) Order Book Analysis ===
+
+export interface OrderBookEntry {
+  price: number;
+  volume: number;
+  side: 'buy' | 'sell';
+}
+
+export const getDetailedOrderBook = (): OrderBookEntry[] => {
+  const entries: OrderBookEntry[] = [];
+  const rows = document.querySelectorAll('[role="row"]');
+
+  Array.from(rows).forEach((row) => {
+    const cells = row.querySelectorAll('[role="gridcell"]');
+    if (cells.length < 2) return;
+
+    const priceEl = cells[0]?.querySelector('.cursor-pointer');
+    if (!priceEl) return;
+
+    const color = getComputedStyle(priceEl).getPropertyValue('color');
+    const price = parseFloat(priceEl.textContent || '0');
+    if (!price) return;
+
+    const volumeText = cells[1]?.textContent?.trim() || '0';
+    const volume = parseFloat(volumeText.replace(/[^\d.]/g, '')) || 0;
+
+    let side: 'buy' | 'sell' | null = null;
+    if (color === 'rgb(246, 70, 93)') side = 'sell';
+    else if (color === 'rgb(46, 189, 133)') side = 'buy';
+
+    if (side) {
+      entries.push({ price, volume, side });
+    }
+  });
+
+  return entries;
+};
+
+export interface SupportResistance {
+  supportPrice: number;
+  resistancePrice: number;
+  supportVolume: number;
+  resistanceVolume: number;
+}
+
+export const findSupportResistance = (orderBook: OrderBookEntry[]): SupportResistance | null => {
+  const buySide = orderBook.filter((e) => e.side === 'buy' && e.volume > 0);
+  const sellSide = orderBook.filter((e) => e.side === 'sell' && e.volume > 0);
+
+  if (buySide.length === 0 || sellSide.length === 0) return null;
+
+  // Find price level with highest volume on each side
+  const support = buySide.reduce((max, e) => (e.volume > max.volume ? e : max), buySide[0]);
+  const resistance = sellSide.reduce((max, e) => (e.volume > max.volume ? e : max), sellSide[0]);
+
+  return {
+    supportPrice: support.price,
+    resistancePrice: resistance.price,
+    supportVolume: support.volume,
+    resistanceVolume: resistance.volume,
+  };
+};
+
+export interface SideVWAP {
+  buyVWAP: number;
+  sellVWAP: number;
+}
+
+export const calculateSideVWAP = (orderBook: OrderBookEntry[]): SideVWAP | null => {
+  const buySide = orderBook.filter((e) => e.side === 'buy' && e.volume > 0);
+  const sellSide = orderBook.filter((e) => e.side === 'sell' && e.volume > 0);
+
+  if (buySide.length === 0 || sellSide.length === 0) return null;
+
+  const buyTotalVolume = buySide.reduce((sum, e) => sum + e.volume, 0);
+  const sellTotalVolume = sellSide.reduce((sum, e) => sum + e.volume, 0);
+
+  const buyVWAP = buySide.reduce((sum, e) => sum + e.price * e.volume, 0) / buyTotalVolume;
+  const sellVWAP = sellSide.reduce((sum, e) => sum + e.price * e.volume, 0) / sellTotalVolume;
+
+  return { buyVWAP, sellVWAP };
+};
+
+export interface BLSSuggestion {
+  suggestedBuyPrice: number;
+  suggestedSellPrice: number;
+  potentialProfit: number; // percentage
+  potentialProfitUSD: number; // dollar amount based on volume
+  supportPrice: number;
+  resistancePrice: number;
+}
+
+export const suggestBLSPrices = (): BLSSuggestion | null => {
+  const orderBook = getDetailedOrderBook();
+  const sr = findSupportResistance(orderBook);
+  const vwap = calculateSideVWAP(orderBook);
+
+  if (!sr || !vwap) return null;
+
+  // Ensure support < resistance for buy-low-sell-high to make sense
+  if (sr.supportPrice >= sr.resistancePrice) return null;
+
+  const weight = getBLSPriceWeight(); // 0 = pure support/resistance, 1 = pure VWAP
+
+  const suggestedBuyPrice = sr.supportPrice * (1 - weight) + vwap.buyVWAP * weight;
+  const suggestedSellPrice = sr.resistancePrice * (1 - weight) + vwap.sellVWAP * weight;
+
+  // Ensure buy < sell after weighting
+  if (suggestedBuyPrice >= suggestedSellPrice) return null;
+
+  const potentialProfit =
+    ((suggestedSellPrice - suggestedBuyPrice) / suggestedBuyPrice) * 100;
+  const volume = getVolume();
+  const potentialProfitUSD = (potentialProfit * volume) / 100;
+
+  return {
+    suggestedBuyPrice,
+    suggestedSellPrice,
+    potentialProfit,
+    potentialProfitUSD,
+    supportPrice: sr.supportPrice,
+    resistancePrice: sr.resistancePrice,
+  };
+};
+
+export const shouldPlaceBLSOrder = (
+  suggestion: BLSSuggestion
+): { canPlace: boolean; reason: string } => {
+  const minProfit = getBLSMinProfit();
+
+  if (suggestion.potentialProfit < minProfit) {
+    return {
+      canPlace: false,
+      reason: `Low profit: ${suggestion.potentialProfit.toFixed(2)}%`,
+    };
+  }
+
+  // Check momentum if enabled
+  if (getEnableMomentumCheck()) {
+    const momentum = getMomentum();
+    const threshold = getMomentumThreshold();
+    if (momentum !== null && momentum < threshold) {
+      return {
+        canPlace: false,
+        reason: `Momentum ${momentum.toFixed(2)}%`,
+      };
+    }
+  }
+
+  // Check order book depth — need meaningful volume on both sides
+  const orderBook = getDetailedOrderBook();
+  const buySide = orderBook.filter((e) => e.side === 'buy' && e.volume > 0);
+  const sellSide = orderBook.filter((e) => e.side === 'sell' && e.volume > 0);
+  if (buySide.length < 2 || sellSide.length < 2) {
+    return { canPlace: false, reason: 'Insufficient OB depth' };
+  }
+
+  return { canPlace: true, reason: 'Conditions met' };
 };

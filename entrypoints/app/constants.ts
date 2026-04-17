@@ -21,6 +21,11 @@ export const DEFAULT_ENABLE_PROACTIVE_CUT_LOSS = true;
 export const DEFAULT_PROACTIVE_MOMENTUM_THRESHOLD = -1; // Emergency cut-loss when price crashing (-1%)
 export const DEFAULT_PROACTIVE_ORDER_BOOK_THRESHOLD = 0.3; // Emergency cut-loss when heavy sell pressure
 
+// === Buy Low / Sell High (BLS) Mode Settings ===
+export const DEFAULT_ENABLE_BLS_MODE = false;
+export const DEFAULT_BLS_MIN_PROFIT = 0.01; // Minimum potential profit % to suggest order (~$0.05 at 550 USDT)
+export const DEFAULT_BLS_PRICE_WEIGHT = 0.5; // Weight between support/resistance (0) and VWAP (1)
+
 // === Price History Settings ===
 export const PRICE_HISTORY_SIZE = 20;
 export const MOMENTUM_SAMPLE_SIZE = 5;

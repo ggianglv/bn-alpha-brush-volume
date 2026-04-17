@@ -8,6 +8,7 @@ import {
   getGapThreshold,
   getCancelThreshold,
   getEnableDynamicSlippage,
+  getEnableBLSMode,
   sleep,
   waitForElm,
   getLatestPrice,
@@ -18,10 +19,14 @@ import {
   checkTradeConditions,
   checkProactiveCutLoss,
   getMomentum,
+  // BLS helpers
+  suggestBLSPrices,
+  shouldPlaceBLSOrder,
+  type BLSSuggestion,
 } from '@/entrypoints/app/utils.ts';
 
 // Signal types
-export type TradingSignal = 'none' | 'buy' | 'cancel_buy' | 'cut_loss';
+export type TradingSignal = 'none' | 'buy' | 'cancel_buy' | 'cut_loss' | 'place_order';
 
 // Stats for display
 export interface AdvancedBuyStats {
@@ -31,6 +36,8 @@ export interface AdvancedBuyStats {
   momentum: number | null;
   hasBuyOrders: boolean;
   hasSellOrders: boolean;
+  potentialProfit: number | null;
+  potentialProfitUSD: number | null;
 }
 
 interface AdvancedBuyProps {
@@ -43,6 +50,7 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
   const [currentGap, setCurrentGap] = useState<number | null>(null);
   const [hasBuyOrders, setHasBuyOrders] = useState(false);
   const [hasSellOrders, setHasSellOrders] = useState(false);
+  const [blsSuggestion, setBlsSuggestion] = useState<BLSSuggestion | null>(null);
 
   const monitorIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -53,6 +61,7 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
       buy: 'B',
       cancel_buy: 'C',
       cut_loss: 'X',
+      place_order: 'P',
       none: '...',
     };
     return signalMap[signal];
@@ -63,6 +72,7 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
       buy: '#2EBD85', // Green
       cancel_buy: '#F0B90B', // Yellow
       cut_loss: '#F6465D', // Red
+      place_order: '#1E90FF', // Blue
       none: '#848e9c', // Gray
     };
     return colorMap[signal];
@@ -84,6 +94,7 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
     const hasSell = sellOrders.length > 0;
     const cancelThreshold = getCancelThreshold();
     const gapThreshold = getGapThreshold();
+    const isBLSMode = getEnableBLSMode();
 
     // Update order state
     setHasBuyOrders(hasBuy);
@@ -119,8 +130,26 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
       return { type: 'none', reason: 'Waiting for buy order to fill' };
     }
 
-    // Priority 3: BUY (when all conditions met and no open orders)
+    // Priority 3: BUY or PLACE ORDER (when no open orders)
     if (!hasBuy && !hasSell) {
+      // BLS Mode: analyze order book for optimal prices
+      if (isBLSMode) {
+        const suggestion = suggestBLSPrices();
+        setBlsSuggestion(suggestion);
+
+        if (!suggestion) {
+          return { type: 'none', reason: 'Analyzing order book...' };
+        }
+
+        const check = shouldPlaceBLSOrder(suggestion);
+        if (check.canPlace) {
+          return { type: 'place_order', reason: null };
+        } else {
+          return { type: 'none', reason: check.reason };
+        }
+      }
+
+      // Volume Brush mode (original)
       if (Math.abs(gap) < gapThreshold) {
         const tradeCheck = checkTradeConditions(buyPrice, sellPrice);
         if (tradeCheck.canTrade) {
@@ -185,8 +214,10 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
       momentum: getMomentum(),
       hasBuyOrders,
       hasSellOrders,
+      potentialProfit: blsSuggestion?.potentialProfit ?? null,
+      potentialProfitUSD: blsSuggestion?.potentialProfitUSD ?? null,
     });
-  }, [signal, signalReason, currentGap, hasBuyOrders, hasSellOrders, onSignalChange]);
+  }, [signal, signalReason, currentGap, hasBuyOrders, hasSellOrders, blsSuggestion, onSignalChange]);
 
   // === Trade Execution Functions (for manual Advanced Buy) ===
 
@@ -281,7 +312,73 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
 
   // === Main Advanced Buy Execution (manual trigger) ===
 
+  const fillBuyPriceExact = async (price: number) => {
+    const input = document.getElementById('limitPrice');
+    if (!input) {
+      console.error('Buy price input not found');
+      return;
+    }
+    (input as HTMLInputElement).value = price.toString();
+    await sleep(random(30, 100));
+    const event = new Event('input', { bubbles: true });
+    input.dispatchEvent(event);
+  };
+
+  const fillSellPriceExact = async (price: number) => {
+    const inputs = document.querySelectorAll('#limitTotal');
+    const input = inputs[1];
+    if (!input) {
+      console.error('Sell price input not found');
+      return;
+    }
+    (input as HTMLInputElement).value = price.toString();
+    await sleep(random(30, 100));
+    const event = new Event('input', { bubbles: true });
+    input.dispatchEvent(event);
+  };
+
   const executeAdvancedBuy = async () => {
+    const isBLSMode = getEnableBLSMode();
+
+    if (isBLSMode) {
+      // BLS Mode: use suggested prices from order book analysis
+      const suggestion = blsSuggestion || suggestBLSPrices();
+      if (!suggestion) {
+        console.error('[AdvancedBuy BLS] No suggestion available');
+        return;
+      }
+
+      try {
+        console.log(
+          `[AdvancedBuy BLS] Buy: ${suggestion.suggestedBuyPrice}, ` +
+            `Sell: ${suggestion.suggestedSellPrice}, ` +
+            `Profit: +${suggestion.potentialProfit.toFixed(2)}% (~$${suggestion.potentialProfitUSD.toFixed(2)})`
+        );
+
+        await checkReserveOrder();
+        await sleep(random(30, 100));
+
+        await randomClickOrderBook();
+        await sleep(random(30, 100));
+
+        await fillBuyPriceExact(suggestion.suggestedBuyPrice);
+        await sleep(random(30, 100));
+
+        await fillSellPriceExact(suggestion.suggestedSellPrice);
+        await sleep(random(30, 100));
+
+        await fillVolume();
+        await sleep(random(30, 100));
+
+        executeBuy();
+        console.log('[AdvancedBuy BLS] Order executed successfully');
+      } catch (error) {
+        console.error('[AdvancedBuy BLS] Error executing trade:', error);
+      }
+      return;
+    }
+
+    // Volume Brush mode (original)
     const { buyPrice: latestBuyPrice, sellPrice: latestSellPrice } = getLatestPrice();
     if (!latestBuyPrice || !latestSellPrice) {
       console.error('[AdvancedBuy] Failed to get latest price');
@@ -350,6 +447,17 @@ const AdvancedBuy = ({ onSignalChange }: AdvancedBuyProps) => {
           >
             {getSignalBadgeText(signal)}
           </Badge>
+          {getEnableBLSMode() && blsSuggestion && signal === 'place_order' && (
+            <span
+              style={{
+                fontSize: '10px',
+                color: '#2EBD85',
+                fontWeight: 'bold',
+              }}
+            >
+              +{blsSuggestion.potentialProfit.toFixed(2)}% (~${blsSuggestion.potentialProfitUSD.toFixed(2)})
+            </span>
+          )}
         </div>
       </Button>
     </Tooltip>

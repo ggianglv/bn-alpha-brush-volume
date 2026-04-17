@@ -11,11 +11,24 @@ import { getGapThreshold } from './utils.ts';
 // Helper function to get signal display text and color
 const getSignalDisplay = (
   signal: TradingSignal,
-  reason: string | null
+  reason: string | null,
+  potentialProfit?: number | null,
+  potentialProfitUSD?: number | null
 ): { text: string; color: string; isBold: boolean } => {
   switch (signal) {
     case 'buy':
       return { text: 'BUY', color: '#2EBD85', isBold: true };
+    case 'place_order': {
+      const profitText =
+        potentialProfit != null && potentialProfitUSD != null
+          ? ` (+${potentialProfit.toFixed(2)}% / ~$${potentialProfitUSD.toFixed(2)})`
+          : '';
+      return {
+        text: `PLACE ORDER${profitText}`,
+        color: '#1E90FF',
+        isBold: true,
+      };
+    }
     case 'cancel_buy':
       return {
         text: `CANCEL BUY ORDER${reason ? ` (${reason})` : ''}`,
@@ -42,6 +55,8 @@ const App = () => {
     momentum: null,
     hasBuyOrders: false,
     hasSellOrders: false,
+    potentialProfit: null,
+    potentialProfitUSD: null,
   });
 
   const handleSignalChange = useCallback((newStats: AdvancedBuyStats) => {
@@ -50,7 +65,7 @@ const App = () => {
 
   const gapThreshold = getGapThreshold();
   const isGapGood = stats.gap !== null && Math.abs(stats.gap) < gapThreshold;
-  const signalDisplay = getSignalDisplay(stats.signal, stats.signalReason);
+  const signalDisplay = getSignalDisplay(stats.signal, stats.signalReason, stats.potentialProfit, stats.potentialProfitUSD);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -112,19 +127,23 @@ const App = () => {
           backgroundColor:
             stats.signal === 'buy'
               ? 'rgba(46, 189, 133, 0.15)'
-              : stats.signal === 'cancel_buy'
-                ? 'rgba(240, 185, 11, 0.15)'
-                : stats.signal === 'cut_loss'
-                  ? 'rgba(246, 70, 93, 0.15)'
-                  : 'rgba(132, 142, 156, 0.1)',
+              : stats.signal === 'place_order'
+                ? 'rgba(30, 144, 255, 0.15)'
+                : stats.signal === 'cancel_buy'
+                  ? 'rgba(240, 185, 11, 0.15)'
+                  : stats.signal === 'cut_loss'
+                    ? 'rgba(246, 70, 93, 0.15)'
+                    : 'rgba(132, 142, 156, 0.1)',
           border: `1px solid ${
             stats.signal === 'buy'
               ? 'rgba(46, 189, 133, 0.3)'
-              : stats.signal === 'cancel_buy'
-                ? 'rgba(240, 185, 11, 0.3)'
-                : stats.signal === 'cut_loss'
-                  ? 'rgba(246, 70, 93, 0.3)'
-                  : 'rgba(132, 142, 156, 0.2)'
+              : stats.signal === 'place_order'
+                ? 'rgba(30, 144, 255, 0.3)'
+                : stats.signal === 'cancel_buy'
+                  ? 'rgba(240, 185, 11, 0.3)'
+                  : stats.signal === 'cut_loss'
+                    ? 'rgba(246, 70, 93, 0.3)'
+                    : 'rgba(132, 142, 156, 0.2)'
           }`,
         }}
       >
